@@ -1,0 +1,14 @@
+# Spielstand bleibt lokal — gehört nicht ins Repo
+savegame.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Temporäre Dateien
+*.new
+_smoke_test.py
+_smoke_save.json
+
+# Lokale Claude-Code-Einstellungen
+.claude/
