@@ -178,7 +178,8 @@ def get_data():
 # ── SVG ───────────────────────────────────────────────────────────────────────
 def build_svg():
     g = load_game()
-    NW, NH = 235, 96
+    NW, NH = 235, 116
+    ratio = getattr(g, "INPUT_RATIO", 1)
 
     def esc(s):
         return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
@@ -212,8 +213,9 @@ def build_svg():
             col    = g.MATERIALS[inp]["color"]
             x1, y1 = ix + NW/2, iy + NH
             x2, y2 = ox + NW/2, oy
+            ctrl = max(18, (y2 - y1) * 0.38)
             parts.append(
-                f'<path d="M {x1} {y1} C {x1} {y1+55},{x2} {y2-55},{x2} {y2-4}" '
+                f'<path d="M {x1} {y1} C {x1} {y1+ctrl},{x2} {y2-ctrl},{x2} {y2-4}" '
                 f'fill="none" stroke="{col}" stroke-width="2.5" opacity="0.65" '
                 f'marker-end="url(#{mk[col]})">'
                 f'<title>{esc(inp)} → {esc(bname)} → {esc(out)}</title></path>')
@@ -231,6 +233,15 @@ def build_svg():
                   f"\nProduced by: {esc(bname) if bname else '— none —'}"
                   + (f"\nInputs: {', '.join(b['inputs'])}" if b.get("inputs") else "")
                   + (f"\nUsed by: {', '.join(used)}" if used else "\nEndpoint"))
+        if b.get("extraction"):
+            inp_line = "raw resource"
+            inp_col  = "#556b8f"
+        elif b.get("inputs"):
+            inp_line = "  +  ".join(f"{ratio}× {m}" for m in b["inputs"])
+            inp_col  = "#8fa3c8"
+        else:
+            inp_line = ""
+            inp_col  = "#8fa3c8"
         parts.append(
             f'<g><title>{tip}</title>'
             f'<rect x="{x}" y="{y}" width="{NW}" height="{NH}" '
@@ -238,9 +249,12 @@ def build_svg():
             f'<text x="{x+14}" y="{y+30}" fill="{col}" '
             f'font-size="15" font-weight="bold" font-family="Segoe UI">'
             f'{esc(info["emoji"])} {esc(mat)}</text>'
-            f'<text x="{x+14}" y="{y+56}" fill="#fbbf24" font-size="12" '
+            + (f'<text x="{x+14}" y="{y+48}" fill="{inp_col}" '
+               f'font-size="10" font-family="Segoe UI">{esc(inp_line)}</text>'
+               if inp_line else "")
+            + f'<text x="{x+14}" y="{y+68}" fill="#fbbf24" font-size="12" '
             f'font-family="Segoe UI">{info["price"]} Cr</text>'
-            f'<text x="{x+14}" y="{y+78}" fill="#8fa3c8" font-size="12" '
+            f'<text x="{x+14}" y="{y+88}" fill="#8fa3c8" font-size="12" '
             f'font-family="Segoe UI">{esc(bname) if bname else "no building"}'
             f'{"  (raw)" if b.get("extraction") else ""}</text></g>')
 
