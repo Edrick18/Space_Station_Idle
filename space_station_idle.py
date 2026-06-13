@@ -354,15 +354,19 @@ class App(tk.Tk):
         self.cur_tab     = "station"   # "station" | "research"
 
         # drag state
-        self._drag_btype: str | None    = None
-        self._drag_ghost: tk.Widget | None = None
-        self._drag_moved: bool          = False
+        self._drag_btype:    str | None       = None
+        self._drag_ghost:    tk.Widget | None = None
+        self._drag_moved:    bool             = False
+        self._drag_start_xy: tuple[int,int]   = (0, 0)
 
         self.title(f"Space Station Idle  v{VERSION}")
         self.configure(bg=BG)
         self.resizable(False, False)
         self.geometry("1280x760")
         self._build_ui()
+        # global drag handlers — always active, guarded by _drag_btype check
+        self.bind_all("<Motion>",          self._on_drag_motion)
+        self.bind_all("<ButtonRelease-1>", self._on_drag_release)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self._schedule_tick()
 
@@ -663,58 +667,55 @@ class App(tk.Tk):
     def _drag_start(self, event: tk.Event, bname: str):
         if self.gs.credits < BUILDINGS[bname]["credits"]:
             return
-        self._drag_btype = bname
-        self._drag_moved = False
+        self._drag_btype    = bname
+        self._drag_moved    = False
+        self._drag_start_xy = (event.x_root, event.y_root)
+        # ghost created lazily on first motion (avoids flicker on plain click)
 
-        out   = BUILDINGS[bname]["output"]
-        emoji = MATERIALS[out]["emoji"]
-        self._drag_ghost = tk.Label(self,
-            text=f"  {emoji} {bname}  ",
-            bg=ACCENT, fg="white", font=("Segoe UI", 9, "bold"),
-            padx=6, pady=3, relief="raised")
-        gx = event.x_root - self.winfo_rootx() - 50
-        gy = event.y_root - self.winfo_rooty() - 14
-        self._drag_ghost.place(x=gx, y=gy)
-
-        event.widget.grab_set()
-        event.widget.bind("<Motion>",
-                           lambda e, w=event.widget: self._drag_motion(e, w))
-        event.widget.bind("<ButtonRelease-1>",
-                           lambda e, w=event.widget: self._drag_drop(e, w))
-
-    def _drag_motion(self, event: tk.Event, widget: tk.Widget):
-        self._drag_moved = True
+    def _on_drag_motion(self, event: tk.Event):
+        if not self._drag_btype:
+            return
+        dx = event.x_root - self._drag_start_xy[0]
+        dy = event.y_root - self._drag_start_xy[1]
+        if abs(dx) < 5 and abs(dy) < 5:
+            return   # ignore tiny jitter
+        if not self._drag_moved:
+            self._drag_moved = True
+            # create ghost now that we know it's a real drag
+            bname = self._drag_btype
+            out   = BUILDINGS[bname]["output"]
+            self._drag_ghost = tk.Label(
+                self,
+                text=f"  {MATERIALS[out]['emoji']}  {bname}  ",
+                bg=ACCENT, fg="white", font=("Segoe UI", 9, "bold"),
+                padx=6, pady=3, relief="raised")
         if self._drag_ghost:
-            gx = event.x_root - self.winfo_rootx() - 50
-            gy = event.y_root - self.winfo_rooty() - 14
-            self._drag_ghost.place(x=gx, y=gy)
+            self._drag_ghost.place(
+                x=event.x_root - self.winfo_rootx() - 60,
+                y=event.y_root - self.winfo_rooty() - 14)
 
-    def _drag_drop(self, event: tk.Event, widget: tk.Widget):
-        widget.grab_release()
-        widget.unbind("<Motion>")
-        widget.unbind("<ButtonRelease-1>")
-
+    def _on_drag_release(self, event: tk.Event):
+        if not self._drag_btype:
+            return
         btype = self._drag_btype
         moved = self._drag_moved
         self._end_drag()
 
-        if not btype:
-            return
-
         if not moved:
-            # plain click → remember selection (used when clicking empty slot)
+            # plain click on shop item → select for click-to-place
             self._selected_btype = btype
             return
 
         if self.cur_tab != "station" or not hasattr(self, "_canvas"):
             return
 
-        # find slot under cursor
-        cx = self._canvas.winfo_rootx()
-        cy = self._canvas.winfo_rooty()
+        cx   = self._canvas.winfo_rootx()
+        cy   = self._canvas.winfo_rooty()
         slot = self._pixel_to_slot(event.x_root - cx, event.y_root - cy)
         if slot is not None:
-            self._place(btype, slot)
+            st = self.gs.stations[self.cur_station]
+            if slot not in st.instances:
+                self._place(btype, slot)
 
     def _end_drag(self):
         if self._drag_ghost:
