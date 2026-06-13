@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Raumstation Idle — Idle/Incremental-Spiel mit Produktionsketten.
+"""Space Station Idle — an idle/incremental game about production chains.
 
-Läuft vollständig offline mit Python + tkinter.
-Speichert automatisch in savegame.json (gleicher Ordner).
+Runs fully offline with Python + tkinter.
+Progress is saved automatically to savegame.json (same folder).
 """
 
 import json
@@ -20,24 +20,25 @@ SAVE_FILE = os.path.join(BASE_DIR, "savegame.json")
 
 VERSION = "1.0.0"
 
-# --- Auto-Update über GitHub (optional — schlägt leise fehl) ---
-# Beim Start wird im Hintergrund geprüft, ob auf GitHub eine neuere Version
-# liegt. Wenn ja, wird sie heruntergeladen und ist beim nächsten Start aktiv.
-# Ohne Internet, ohne Update oder bei jedem Fehler läuft das Spiel einfach
-# normal weiter — Updates sind nie Pflicht.
-UPDATE_USER = "DEIN-GITHUB-BENUTZERNAME"
-UPDATE_REPO = "raumstation-idle"
+# --- Auto-update via GitHub (optional — fails silently) ---
+# On startup a background thread checks whether a newer version exists in
+# the repository below. If so, it is downloaded and becomes active on the
+# next launch. Without internet, without an update, or on any error the
+# game simply keeps running — updates are never mandatory.
+UPDATE_USER = "Edick18"
+UPDATE_REPO = "Space_Station_Idle"
 UPDATE_BRANCH = "main"
+UPDATE_FILE = "space_station_idle.py"
 
-INTERVAL = 5.0              # Sekunden pro Produktionszyklus
-OFFLINE_CAP = 24 * 3600     # Offline-Produktion maximal 24 Stunden
+INTERVAL = 5.0              # seconds per production cycle
+OFFLINE_CAP = 24 * 3600     # offline production capped at 24 hours
 AUTOSAVE_SECONDS = 30.0
-COST_GROWTH = 1.2           # Creditkosten steigen pro gekauftem Gebäude
+COST_GROWTH = 1.2           # credit cost rises per building purchased
 FRAME_MS = 40               # ~25 FPS
 
-RAWS = ["Eisenerz", "Kohle", "Kupfererz", "Siliziumsand", "Rohöl"]
+RAWS = ["Iron Ore", "Coal", "Copper Ore", "Silicon Sand", "Crude Oil"]
 
-# ----- Farben -----
+# ----- Colors -----
 BG = "#0b0f1a"
 CARD = "#151d33"
 CARD_HOVER = "#1a2440"
@@ -54,118 +55,148 @@ RED = "#f87171"
 
 PANEL_W = 320
 
-# Akzentfarben pro Produktionskette
-C_METALL = "#60a5fa"    # Eisen / Stahl
-C_KOHLE = "#9ca3af"
-C_KUPFER = "#fb923c"    # Kupfer / Kabel
-C_SILIZIUM = "#4ade80"  # Silizium / Elektronik
-C_OEL = "#facc15"       # Öl / Kunststoff
-C_MECHANIK = "#a78bfa"
-C_ROBOTIK = "#f472b6"
+# Accent colors per production chain
+C_METAL = "#60a5fa"     # iron / steel
+C_COAL = "#9ca3af"
+C_COPPER = "#fb923c"    # copper / cables
+C_SILICON = "#4ade80"   # silicon / electronics
+C_OIL = "#facc15"       # oil / plastic
+C_MECH = "#a78bfa"
+C_ROBOT = "#f472b6"
 
-# Material: Emoji, Verkaufspreis, Position (x, y), Akzentfarbe
+# Material: emoji, sell price, position (x, y), accent color
 MATERIALS = {
-    # Tier 0 — Rohstoffe
-    "Eisenerz":         {"emoji": "🔩", "price": 1,    "pos": (150, 60),    "color": C_METALL},
-    "Kohle":            {"emoji": "⚫", "price": 1,    "pos": (420, 60),    "color": C_KOHLE},
-    "Kupfererz":        {"emoji": "🟠", "price": 1,    "pos": (690, 60),    "color": C_KUPFER},
-    "Siliziumsand":     {"emoji": "🏜️", "price": 1,    "pos": (960, 60),    "color": C_SILIZIUM},
-    "Rohöl":            {"emoji": "🛢️", "price": 1,    "pos": (1230, 60),   "color": C_OEL},
-    # Tier 1 — erste Verarbeitung
-    "Eisenbarren":      {"emoji": "🧱", "price": 2,    "pos": (150, 250),   "color": C_METALL},
-    "Kupferbarren":     {"emoji": "🟧", "price": 2,    "pos": (690, 250),   "color": C_KUPFER},
-    "Rohsilizium":      {"emoji": "💎", "price": 2,    "pos": (960, 250),   "color": C_SILIZIUM},
-    "Kunststoff":       {"emoji": "🧪", "price": 2,    "pos": (1230, 250),  "color": C_OEL},
+    # Tier 0 — raw resources
+    "Iron Ore":        {"emoji": "🔩", "price": 1,    "pos": (150, 60),    "color": C_METAL},
+    "Coal":            {"emoji": "⚫", "price": 1,    "pos": (420, 60),    "color": C_COAL},
+    "Copper Ore":      {"emoji": "🟠", "price": 1,    "pos": (690, 60),    "color": C_COPPER},
+    "Silicon Sand":    {"emoji": "🏜️", "price": 1,    "pos": (960, 60),    "color": C_SILICON},
+    "Crude Oil":       {"emoji": "🛢️", "price": 1,    "pos": (1230, 60),   "color": C_OIL},
+    # Tier 1 — first processing
+    "Iron Ingot":      {"emoji": "🧱", "price": 2,    "pos": (150, 250),   "color": C_METAL},
+    "Copper Ingot":    {"emoji": "🟧", "price": 2,    "pos": (690, 250),   "color": C_COPPER},
+    "Raw Silicon":     {"emoji": "💎", "price": 2,    "pos": (960, 250),   "color": C_SILICON},
+    "Plastic":         {"emoji": "🧪", "price": 2,    "pos": (1230, 250),  "color": C_OIL},
     # Tier 2
-    "Stahlbarren":      {"emoji": "⚒️", "price": 6,    "pos": (280, 440),   "color": C_METALL},
-    "Kupferdraht":      {"emoji": "🧵", "price": 6,    "pos": (690, 440),   "color": C_KUPFER},
-    "Siliziumwafer":    {"emoji": "💿", "price": 8,    "pos": (960, 440),   "color": C_SILIZIUM},
+    "Steel Ingot":     {"emoji": "⚒️", "price": 6,    "pos": (280, 440),   "color": C_METAL},
+    "Copper Wire":     {"emoji": "🧵", "price": 6,    "pos": (690, 440),   "color": C_COPPER},
+    "Silicon Wafer":   {"emoji": "💿", "price": 8,    "pos": (960, 440),   "color": C_SILICON},
     # Tier 3
-    "Eisenplatte":      {"emoji": "🟫", "price": 16,   "pos": (150, 630),   "color": C_METALL},
-    "Stahlblech":       {"emoji": "🪨", "price": 14,   "pos": (420, 630),   "color": C_METALL},
-    "Kupferkabel":      {"emoji": "🪢", "price": 16,   "pos": (690, 630),   "color": C_KUPFER},
-    "Mikrochip":        {"emoji": "🔲", "price": 28,   "pos": (960, 630),   "color": C_SILIZIUM},
+    "Iron Plate":      {"emoji": "🟫", "price": 16,   "pos": (150, 630),   "color": C_METAL},
+    "Steel Sheet":     {"emoji": "🪨", "price": 14,   "pos": (420, 630),   "color": C_METAL},
+    "Copper Cable":    {"emoji": "🪢", "price": 16,   "pos": (690, 630),   "color": C_COPPER},
+    "Microchip":       {"emoji": "🔲", "price": 28,   "pos": (960, 630),   "color": C_SILICON},
     # Tier 4
-    "Stahlträger":      {"emoji": "🏗️", "price": 60,   "pos": (280, 820),   "color": C_METALL},
-    "Isoliertes Kabel": {"emoji": "🔌", "price": 36,   "pos": (690, 820),   "color": C_KUPFER},
+    "Steel Beam":      {"emoji": "🏗️", "price": 60,   "pos": (280, 820),   "color": C_METAL},
+    "Insulated Cable": {"emoji": "🔌", "price": 36,   "pos": (690, 820),   "color": C_COPPER},
     # Tier 5
-    "Spule":            {"emoji": "🧲", "price": 76,   "pos": (500, 1010),  "color": C_KUPFER},
-    "Platine":          {"emoji": "💻", "price": 128,  "pos": (830, 1010),  "color": C_SILIZIUM},
+    "Coil":            {"emoji": "🧲", "price": 76,   "pos": (500, 1010),  "color": C_COPPER},
+    "Circuit Board":   {"emoji": "💻", "price": 128,  "pos": (830, 1010),  "color": C_SILICON},
     # Tier 6
-    "Maschinenrahmen":  {"emoji": "🛠️", "price": 272,  "pos": (420, 1200),  "color": C_MECHANIK},
+    "Machine Frame":   {"emoji": "🛠️", "price": 272,  "pos": (420, 1200),  "color": C_MECH},
     # Tier 7
-    "Motor":            {"emoji": "⚙️", "price": 572,  "pos": (420, 1390),  "color": C_MECHANIK},
+    "Motor":           {"emoji": "⚙️", "price": 572,  "pos": (420, 1390),  "color": C_MECH},
     # Tier 8
-    "Basisroboter":     {"emoji": "🤖", "price": 1520, "pos": (650, 1580),  "color": C_ROBOTIK},
+    "Basic Robot":     {"emoji": "🤖", "price": 1520, "pos": (650, 1580),  "color": C_ROBOT},
 }
 
-# Gebäude in Produktionsreihenfolge (Rohstoffe zuerst, damit Ketten
-# innerhalb eines Zyklus sauber durchlaufen)
+# Buildings in production order (raw resources first so chains flow
+# cleanly within a single cycle)
 BUILDINGS = {
-    # Extraktion
-    "Eisenmine":     {"output": "Eisenerz",     "inputs": [], "credits": 50,  "materials": {}, "extraction": True},
-    "Kohlemine":     {"output": "Kohle",        "inputs": [], "credits": 50,  "materials": {}, "extraction": True},
-    "Kupfermine":    {"output": "Kupfererz",    "inputs": [], "credits": 60,  "materials": {}, "extraction": True},
-    "Siliziumbruch": {"output": "Siliziumsand", "inputs": [], "credits": 60,  "materials": {}, "extraction": True},
-    "Ölpumpe":       {"output": "Rohöl",        "inputs": [], "credits": 80,  "materials": {}, "extraction": True},
-    # Erste Verarbeitung
-    "Schmelzofen":    {"output": "Eisenbarren",  "inputs": ["Eisenerz"],     "credits": 100, "materials": {"Eisenerz": 50},     "extraction": False},
-    "Kupferschmelze": {"output": "Kupferbarren", "inputs": ["Kupfererz"],    "credits": 100, "materials": {"Kupfererz": 50},    "extraction": False},
-    "Siliziumofen":   {"output": "Rohsilizium",  "inputs": ["Siliziumsand"], "credits": 100, "materials": {"Siliziumsand": 50}, "extraction": False},
-    "Raffinerie":     {"output": "Kunststoff",   "inputs": ["Rohöl"],        "credits": 120, "materials": {"Rohöl": 50},        "extraction": False},
-    # Metallkette
-    "Hochofen":  {"output": "Stahlbarren", "inputs": ["Eisenbarren", "Kohle"],        "credits": 300,  "materials": {"Eisenbarren": 30, "Kohle": 30},       "extraction": False},
-    "Walzwerk":  {"output": "Eisenplatte", "inputs": ["Eisenbarren", "Stahlbarren"],  "credits": 600,  "materials": {"Eisenbarren": 30, "Stahlbarren": 20}, "extraction": False},
-    "Stahlwerk": {"output": "Stahlblech",  "inputs": ["Stahlbarren", "Kohle"],        "credits": 500,  "materials": {"Stahlbarren": 25, "Kohle": 40},       "extraction": False},
-    "Presswerk": {"output": "Stahlträger", "inputs": ["Stahlblech", "Eisenplatte"],   "credits": 1500, "materials": {"Stahlblech": 20, "Eisenplatte": 20},  "extraction": False},
-    # Kabelkette
-    "Drahtziehwerk": {"output": "Kupferdraht",      "inputs": ["Kupferbarren", "Kohle"],            "credits": 300,  "materials": {"Kupferbarren": 30, "Kohle": 30},        "extraction": False},
-    "Kabelwerk":     {"output": "Kupferkabel",      "inputs": ["Kupferdraht", "Kupferbarren"],      "credits": 600,  "materials": {"Kupferdraht": 25, "Kupferbarren": 25},  "extraction": False},
-    "Isolierwerk":   {"output": "Isoliertes Kabel", "inputs": ["Kupferkabel", "Kunststoff"],        "credits": 1200, "materials": {"Kupferkabel": 20, "Kunststoff": 30},    "extraction": False},
-    "Spulenwerk":    {"output": "Spule",            "inputs": ["Isoliertes Kabel", "Eisenbarren"],  "credits": 2500, "materials": {"Isoliertes Kabel": 15, "Eisenbarren": 30}, "extraction": False},
-    # Elektronikkette
-    "Waferwerk":    {"output": "Siliziumwafer", "inputs": ["Rohsilizium", "Kupferbarren"],   "credits": 500,  "materials": {"Rohsilizium": 30, "Kupferbarren": 25},  "extraction": False},
-    "Chipfabrik":   {"output": "Mikrochip",     "inputs": ["Siliziumwafer", "Kupferdraht"],  "credits": 1500, "materials": {"Siliziumwafer": 20, "Kupferdraht": 30}, "extraction": False},
-    "Platinenwerk": {"output": "Platine",       "inputs": ["Mikrochip", "Isoliertes Kabel"], "credits": 4000, "materials": {"Mikrochip": 15, "Isoliertes Kabel": 15}, "extraction": False},
-    # Mechanik
-    "Maschinenwerk": {"output": "Maschinenrahmen", "inputs": ["Stahlträger", "Spule"],            "credits": 8000,  "materials": {"Stahlträger": 10, "Spule": 10},          "extraction": False},
-    "Motorenfabrik": {"output": "Motor",           "inputs": ["Maschinenrahmen", "Stahlblech"],   "credits": 15000, "materials": {"Maschinenrahmen": 5, "Stahlblech": 20},  "extraction": False},
-    # Robotik
-    "Roboterwerk": {"output": "Basisroboter", "inputs": ["Motor", "Platine", "Stahlträger"], "credits": 40000, "materials": {"Motor": 5, "Platine": 5, "Stahlträger": 10}, "extraction": False},
+    # Extraction
+    "Iron Mine":      {"output": "Iron Ore",     "inputs": [], "credits": 50,  "materials": {}, "extraction": True},
+    "Coal Mine":      {"output": "Coal",         "inputs": [], "credits": 50,  "materials": {}, "extraction": True},
+    "Copper Mine":    {"output": "Copper Ore",   "inputs": [], "credits": 60,  "materials": {}, "extraction": True},
+    "Silicon Quarry": {"output": "Silicon Sand", "inputs": [], "credits": 60,  "materials": {}, "extraction": True},
+    "Oil Pump":       {"output": "Crude Oil",    "inputs": [], "credits": 80,  "materials": {}, "extraction": True},
+    # First processing
+    "Iron Smelter":    {"output": "Iron Ingot",   "inputs": ["Iron Ore"],     "credits": 100, "materials": {"Iron Ore": 50},     "extraction": False},
+    "Copper Smelter":  {"output": "Copper Ingot", "inputs": ["Copper Ore"],   "credits": 100, "materials": {"Copper Ore": 50},   "extraction": False},
+    "Silicon Furnace": {"output": "Raw Silicon",  "inputs": ["Silicon Sand"], "credits": 100, "materials": {"Silicon Sand": 50}, "extraction": False},
+    "Refinery":        {"output": "Plastic",      "inputs": ["Crude Oil"],    "credits": 120, "materials": {"Crude Oil": 50},    "extraction": False},
+    # Metal chain
+    "Blast Furnace": {"output": "Steel Ingot", "inputs": ["Iron Ingot", "Coal"],        "credits": 300,  "materials": {"Iron Ingot": 30, "Coal": 30},        "extraction": False},
+    "Rolling Mill":  {"output": "Iron Plate",  "inputs": ["Iron Ingot", "Steel Ingot"], "credits": 600,  "materials": {"Iron Ingot": 30, "Steel Ingot": 20}, "extraction": False},
+    "Steel Mill":    {"output": "Steel Sheet", "inputs": ["Steel Ingot", "Coal"],       "credits": 500,  "materials": {"Steel Ingot": 25, "Coal": 40},       "extraction": False},
+    "Press Works":   {"output": "Steel Beam",  "inputs": ["Steel Sheet", "Iron Plate"], "credits": 1500, "materials": {"Steel Sheet": 20, "Iron Plate": 20}, "extraction": False},
+    # Cable chain
+    "Wire Mill":        {"output": "Copper Wire",     "inputs": ["Copper Ingot", "Coal"],           "credits": 300,  "materials": {"Copper Ingot": 30, "Coal": 30},         "extraction": False},
+    "Cable Works":      {"output": "Copper Cable",    "inputs": ["Copper Wire", "Copper Ingot"],    "credits": 600,  "materials": {"Copper Wire": 25, "Copper Ingot": 25},  "extraction": False},
+    "Insulation Plant": {"output": "Insulated Cable", "inputs": ["Copper Cable", "Plastic"],        "credits": 1200, "materials": {"Copper Cable": 20, "Plastic": 30},      "extraction": False},
+    "Coil Factory":     {"output": "Coil",            "inputs": ["Insulated Cable", "Iron Ingot"],  "credits": 2500, "materials": {"Insulated Cable": 15, "Iron Ingot": 30}, "extraction": False},
+    # Electronics chain
+    "Wafer Plant":           {"output": "Silicon Wafer", "inputs": ["Raw Silicon", "Copper Ingot"],     "credits": 500,  "materials": {"Raw Silicon": 30, "Copper Ingot": 25},  "extraction": False},
+    "Chip Factory":          {"output": "Microchip",     "inputs": ["Silicon Wafer", "Copper Wire"],    "credits": 1500, "materials": {"Silicon Wafer": 20, "Copper Wire": 30}, "extraction": False},
+    "Circuit Board Factory": {"output": "Circuit Board", "inputs": ["Microchip", "Insulated Cable"],    "credits": 4000, "materials": {"Microchip": 15, "Insulated Cable": 15}, "extraction": False},
+    # Mechanics
+    "Machine Works": {"output": "Machine Frame", "inputs": ["Steel Beam", "Coil"],            "credits": 8000,  "materials": {"Steel Beam": 10, "Coil": 10},           "extraction": False},
+    "Motor Factory": {"output": "Motor",         "inputs": ["Machine Frame", "Steel Sheet"],  "credits": 15000, "materials": {"Machine Frame": 5, "Steel Sheet": 20},  "extraction": False},
+    # Robotics
+    "Robot Factory": {"output": "Basic Robot", "inputs": ["Motor", "Circuit Board", "Steel Beam"], "credits": 40000, "materials": {"Motor": 5, "Circuit Board": 5, "Steel Beam": 10}, "extraction": False},
 }
 
 BUILDING_ORDER = list(BUILDINGS.keys())
 
-# Material -> Gebäude das es produziert
+# Material -> building that produces it
 PRODUCER = {b["output"]: name for name, b in BUILDINGS.items()}
-# Material -> Gebäude die es verbrauchen
+# Material -> buildings that consume it
 CONSUMERS = {m: [] for m in MATERIALS}
 for _name, _b in BUILDINGS.items():
     for _inp in _b["inputs"]:
         CONSUMERS[_inp].append(_name)
 
-# Materialkosten für 2.+ Kauf eines Extraktionsgebäudes
+# Material cost for the 2nd+ purchase of an extraction building
 EXTRACTION_MATERIAL_COST = 25
 
 NODE_W = 235
 NODE_H = 118
 
+# Old German save files (game was originally written in German) are
+# migrated transparently on load so no progress is ever lost.
+LEGACY_NAMES = {
+    # Materials
+    "Eisenerz": "Iron Ore", "Kohle": "Coal", "Kupfererz": "Copper Ore",
+    "Siliziumsand": "Silicon Sand", "Rohöl": "Crude Oil",
+    "Eisenbarren": "Iron Ingot", "Kupferbarren": "Copper Ingot",
+    "Rohsilizium": "Raw Silicon", "Kunststoff": "Plastic",
+    "Stahlbarren": "Steel Ingot", "Kupferdraht": "Copper Wire",
+    "Siliziumwafer": "Silicon Wafer", "Eisenplatte": "Iron Plate",
+    "Stahlblech": "Steel Sheet", "Kupferkabel": "Copper Cable",
+    "Mikrochip": "Microchip", "Stahlträger": "Steel Beam",
+    "Isoliertes Kabel": "Insulated Cable", "Spule": "Coil",
+    "Platine": "Circuit Board", "Maschinenrahmen": "Machine Frame",
+    "Basisroboter": "Basic Robot",
+    # Buildings
+    "Eisenmine": "Iron Mine", "Kohlemine": "Coal Mine",
+    "Kupfermine": "Copper Mine", "Siliziumbruch": "Silicon Quarry",
+    "Ölpumpe": "Oil Pump", "Schmelzofen": "Iron Smelter",
+    "Kupferschmelze": "Copper Smelter", "Siliziumofen": "Silicon Furnace",
+    "Raffinerie": "Refinery", "Hochofen": "Blast Furnace",
+    "Walzwerk": "Rolling Mill", "Stahlwerk": "Steel Mill",
+    "Presswerk": "Press Works", "Drahtziehwerk": "Wire Mill",
+    "Kabelwerk": "Cable Works", "Isolierwerk": "Insulation Plant",
+    "Spulenwerk": "Coil Factory", "Waferwerk": "Wafer Plant",
+    "Chipfabrik": "Chip Factory", "Platinenwerk": "Circuit Board Factory",
+    "Maschinenwerk": "Machine Works", "Motorenfabrik": "Motor Factory",
+    "Roboterwerk": "Robot Factory",
+}
+
 
 # ----------------------------------------------------------------------
-# Hilfsfunktionen
+# Helpers
 # ----------------------------------------------------------------------
 
 def fmt(n):
-    """Ganzzahl mit Punkt als Tausendertrennzeichen (deutsch)."""
-    return f"{int(n):,}".replace(",", ".")
+    """Integer with thousands separators."""
+    return f"{int(n):,}"
 
 
 def fmt_rate(r):
-    return f"{r:.1f}".replace(".", ",")
+    return f"{r:.1f}"
 
 
 def blend(c1, c2, t):
-    """Mischt zwei Hex-Farben: t=0 -> c1, t=1 -> c2."""
+    """Blend two hex colors: t=0 -> c1, t=1 -> c2."""
     t = max(0.0, min(1.0, t))
     r1, g1, b1 = int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)
     r2, g2, b2 = int(c2[1:3], 16), int(c2[3:5], 16), int(c2[5:7], 16)
@@ -187,7 +218,7 @@ def round_rect_points(x1, y1, x2, y2, r):
 
 
 def round_rect(canvas, x1, y1, x2, y2, r, **kw):
-    """Abgerundetes Rechteck als geglättetes Polygon."""
+    """Rounded rectangle as a smoothed polygon."""
     return canvas.create_polygon(round_rect_points(x1, y1, x2, y2, r),
                                  smooth=True, **kw)
 
@@ -200,7 +231,7 @@ def bezier_point(p0, p1, p2, p3, t):
 
 
 def connection_curve(inp, out):
-    """Bezier-Kontrollpunkte für die Linie von Input-Knoten zu Output-Knoten."""
+    """Bezier control points for the line from input node to output node."""
     ix, iy = MATERIALS[inp]["pos"]
     ox, oy = MATERIALS[out]["pos"]
     p0 = (ix + NODE_W / 2, iy + NODE_H)
@@ -211,23 +242,22 @@ def connection_curve(inp, out):
 
 
 def version_tuple(s):
-    """'1.2.3' -> (1, 2, 3) für Versionsvergleiche."""
+    """'1.2.3' -> (1, 2, 3) for version comparisons."""
     nums = re.findall(r"\d+", str(s))
     return tuple(int(n) for n in nums[:4]) if nums else (0,)
 
 
 def check_for_update(result):
-    """Prüft auf GitHub nach einer neueren Version und lädt sie herunter.
+    """Checks GitHub for a newer version and downloads it.
 
-    Läuft in einem Hintergrund-Thread. Jeder Fehler (kein Internet,
-    Repo nicht erreichbar, kaputter Download, ...) wird verschluckt —
-    das Spiel läuft dann einfach mit der vorhandenen Version weiter.
-    `result` wird befüllt mit:
-      status: "unkonfiguriert" | "aktuell" | "installiert" | "offline"
-      version: neue Versionsnummer (nur bei "installiert")
+    Runs in a background thread. Every error (no internet, repository
+    unreachable, broken download, ...) is swallowed — the game then simply
+    keeps running with the current version. `result` is filled with:
+      status: "unconfigured" | "up-to-date" | "installed" | "offline"
+      version: the new version number (only when "installed")
     """
-    if "DEIN-GITHUB" in UPDATE_USER:
-        result["status"] = "unkonfiguriert"
+    if "DEIN-GITHUB" in UPDATE_USER or not UPDATE_USER:
+        result["status"] = "unconfigured"
         return
     import urllib.request
     base = (f"https://raw.githubusercontent.com/"
@@ -237,30 +267,30 @@ def check_for_update(result):
             info = json.loads(r.read().decode("utf-8"))
         remote = str(info.get("version", "0"))
         if version_tuple(remote) <= version_tuple(VERSION):
-            result["status"] = "aktuell"
+            result["status"] = "up-to-date"
             return
 
-        with urllib.request.urlopen(base + "raumstation_idle.py", timeout=20) as r:
+        with urllib.request.urlopen(base + UPDATE_FILE, timeout=20) as r:
             code = r.read()
         text = code.decode("utf-8")
-        # Plausibilitätsprüfung, damit nie eine kaputte Datei installiert wird
+        # Sanity check so a broken file is never installed
         if "class Game" not in text or "VERSION" not in text or len(text) < 5000:
             result["status"] = "offline"
             return
 
-        target = os.path.join(BASE_DIR, "raumstation_idle.py")
+        target = os.path.join(BASE_DIR, UPDATE_FILE)
         tmp = target + ".new"
         with open(tmp, "wb") as f:
             f.write(code)
         os.replace(tmp, target)
         result["version"] = remote
-        result["status"] = "installiert"
+        result["status"] = "installed"
     except Exception:
         result["status"] = "offline"
 
 
 def add_nebula(canvas, cx, cy, rx, ry, color):
-    """Weicher Nebelfleck aus gestaffelten, gestippelten Ovalen."""
+    """Soft nebula blob made of layered stippled ovals."""
     for scale, stipple in ((1.0, "gray12"), (0.7, "gray12"), (0.45, "gray25")):
         canvas.create_oval(cx - rx * scale, cy - ry * scale,
                            cx + rx * scale, cy + ry * scale,
@@ -268,11 +298,11 @@ def add_nebula(canvas, cx, cy, rx, ry, color):
 
 
 # ----------------------------------------------------------------------
-# Spiellogik
+# Game logic
 # ----------------------------------------------------------------------
 
 class Game:
-    """Spiellogik, unabhängig von der Oberfläche."""
+    """Game logic, independent of the user interface."""
 
     def __init__(self):
         self.credits = 0
@@ -280,13 +310,13 @@ class Game:
         self.produced_total = {m: 0 for m in MATERIALS}
         self.counts = {b: 0 for b in BUILDINGS}
         self.timers = {b: 0.0 for b in BUILDINGS}
-        self.events = []  # (material, menge) — fertige Produktionen für Animationen
-        # Startzustand: je 1x jedes Extraktionsgebäude
+        self.events = []  # (material, amount) — finished production for animations
+        # Starting state: one of each extraction building
         for b, data in BUILDINGS.items():
             if data["extraction"]:
                 self.counts[b] = 1
 
-    # ----- Produktion -----
+    # ----- Production -----
 
     def produce(self, bname):
         b = BUILDINGS[bname]
@@ -322,7 +352,7 @@ class Game:
         self.events.clear()
         return cycles
 
-    # ----- Freischaltung / Sichtbarkeit -----
+    # ----- Unlocking / visibility -----
 
     def building_unlocked(self, bname):
         b = BUILDINGS[bname]
@@ -338,7 +368,7 @@ class Game:
     def material_visible(self, mat):
         return self.building_unlocked(PRODUCER[mat])
 
-    # ----- Kaufen / Verkaufen -----
+    # ----- Buying / selling -----
 
     def cost_of(self, bname):
         b = BUILDINGS[bname]
@@ -381,7 +411,7 @@ class Game:
         self.credits += gain
         return gain
 
-    # ----- Produktions-/Verbrauchsraten (theoretisch) -----
+    # ----- Production / consumption rates (theoretical) -----
 
     def rate_produced(self, mat):
         return self.counts[PRODUCER[mat]] / INTERVAL
@@ -389,7 +419,7 @@ class Game:
     def rate_consumed(self, mat):
         return sum(self.counts[c] for c in CONSUMERS[mat]) / INTERVAL
 
-    # ----- Speichern / Laden -----
+    # ----- Saving / loading -----
 
     def to_dict(self):
         return {
@@ -409,7 +439,7 @@ class Game:
             pass
 
     def load(self):
-        """Lädt den Spielstand. Gibt die Offline-Sekunden zurück (0 = neues Spiel)."""
+        """Loads the save file. Returns elapsed offline seconds (0 = new game)."""
         if not os.path.exists(SAVE_FILE):
             return 0
         try:
@@ -417,25 +447,35 @@ class Game:
                 data = json.load(f)
         except (OSError, ValueError):
             return 0
+
+        def migrate(d):
+            # Translate keys of old German save files
+            return {LEGACY_NAMES.get(k, k): v for k, v in d.items()}
+
+        stock = migrate(data.get("stock", {}))
+        produced = migrate(data.get("produced_total", {}))
+        counts = migrate(data.get("counts", {}))
+        timers = migrate(data.get("timers", {}))
+
         self.credits = data.get("credits", 0)
         for m in MATERIALS:
-            self.stock[m] = data.get("stock", {}).get(m, 0)
-            self.produced_total[m] = data.get("produced_total", {}).get(m, 0)
+            self.stock[m] = stock.get(m, 0)
+            self.produced_total[m] = produced.get(m, 0)
         for b in BUILDINGS:
-            self.counts[b] = data.get("counts", {}).get(b, self.counts[b])
-            self.timers[b] = data.get("timers", {}).get(b, 0.0)
+            self.counts[b] = counts.get(b, self.counts[b])
+            self.timers[b] = timers.get(b, 0.0)
         elapsed = max(0, time.time() - data.get("saved_at", time.time()))
         return elapsed
 
 
 # ----------------------------------------------------------------------
-# Oberfläche
+# User interface
 # ----------------------------------------------------------------------
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Raumstation Idle")
+        self.title("Space Station Idle")
         self.geometry("1280x800")
         self.configure(bg=BG)
 
@@ -444,25 +484,25 @@ class App(tk.Tk):
         self.running = False
         self.autosave_timer = 0.0
         self.node_rects = []        # (x1, y1, x2, y2, material)
-        self.floats = []            # schwebende Texte
-        self.flash = {}             # material -> Zeitpunkt des Produktions-Aufleuchtens
-        self.unlock_anim = {}       # material -> Startzeit der Einblend-Animation
+        self.floats = []            # floating texts
+        self.flash = {}             # material -> time of production flash
+        self.unlock_anim = {}       # material -> start time of reveal animation
         self.seen_visible = None
-        self.mouse_widget = None    # (x, y) Mausposition im Karten-Canvas
+        self.mouse_widget = None    # (x, y) mouse position in the map canvas
         self.hover_mat = None
         self.credits_shown = 0.0
         self.dt = 0.0
-        self.shooting = []          # aktive Sternschnuppen
+        self.shooting = []          # active shooting stars
         self.next_shoot = 0.0
 
-        # Seitenpanel-Zustand
+        # Side panel state
         self.panel_visible = False
-        self.panel_offset = PANEL_W   # 0 = offen, PANEL_W = ausgeblendet
-        self.panel_anim = None        # laufende Slide-Animation
+        self.panel_offset = PANEL_W   # 0 = open, PANEL_W = hidden
+        self.panel_anim = None        # running slide animation
         self.panel_mouse = None
         self.panel_buttons = []     # (x1, y1, x2, y2, enabled, callback)
 
-        # Update-Prüfung im Hintergrund — blockiert nie das Spiel
+        # Update check in the background — never blocks the game
         self.update_info = {}
         self.update_note_shown = False
         threading.Thread(target=check_for_update,
@@ -472,7 +512,7 @@ class App(tk.Tk):
         self.show_home()
 
     # ------------------------------------------------------------------
-    # Startbildschirm (animiert)
+    # Home screen (animated)
     # ------------------------------------------------------------------
 
     def show_home(self):
@@ -504,21 +544,21 @@ class App(tk.Tk):
                                       font=("Segoe UI Emoji", 16), fill=TEXT_MAIN)
         self.home_title = [
             c.create_text(cx, 270, text="🚀", font=("Segoe UI Emoji", 60), fill=TEXT_MAIN),
-            c.create_text(cx, 360, text="Raumstation Idle",
+            c.create_text(cx, 360, text="Space Station Idle",
                           font=("Segoe UI", 38, "bold"), fill=TEXT_MAIN),
-            c.create_text(cx, 410, text="Baue deine industrielle Produktionskette im All auf",
+            c.create_text(cx, 410, text="Build your industrial production chain in space",
                           font=("Segoe UI", 13), fill=TEXT_DIM),
         ]
-        c.create_text(cx, 760, text=f"v{VERSION}  •  Automatisches Speichern  •  Offline-Produktion  •  Updates optional",
+        c.create_text(cx, 760, text=f"v{VERSION}  •  Auto-save  •  Offline production  •  Updates optional",
                       font=("Segoe UI", 10), fill=blend(TEXT_DIM, BG, 0.35), tags="footer")
 
-        # Start-Button (Canvas-Elemente mit Glow-Ring)
+        # Start button (canvas elements with glow ring)
         bw, bh, by = 220, 58, 500
         self.home_glow = round_rect(c, cx - bw / 2 - 4, by - 4, cx + bw / 2 + 4, by + bh + 4,
                                     16, fill="", outline="#2563eb", width=2)
         self.home_btn = round_rect(c, cx - bw / 2, by, cx + bw / 2, by + bh,
                                    14, fill="#2563eb", outline="", tags="startbtn")
-        self.home_btn_text = c.create_text(cx, by + bh / 2, text="Starten",
+        self.home_btn_text = c.create_text(cx, by + bh / 2, text="Start",
                                            font=("Segoe UI", 16, "bold"),
                                            fill="white", tags="startbtn")
         c.tag_bind("startbtn", "<Button-1>", lambda e: self.start_game())
@@ -553,22 +593,22 @@ class App(tk.Tk):
                      s["x"] + s["r"], s["y"] + s["r"])
             c.itemconfig(s["item"], fill=blend(BG, "#bcd0f0", b))
 
-        # Titel schwebt sanft
+        # Title floats gently
         dy = math.sin(t * 1.4) * 6
         base_ys = (270, 360, 410)
         for item, by in zip(self.home_title, base_ys):
             c.coords(item, 640, by + dy)
 
-        # Satellit umkreist die Rakete
+        # Satellite orbits the rocket
         ang = t * 1.1
         c.coords(self.home_sat, 640 + 150 * math.cos(ang),
                  270 + dy + 45 * math.sin(ang))
 
-        # Button-Glow pulsiert
+        # Button glow pulses
         pulse = 0.5 + 0.5 * math.sin(t * 2.5)
         c.itemconfig(self.home_glow, outline=blend("#1e3a6e", "#60a5fa", pulse))
 
-        # Sternschnuppen
+        # Shooting stars
         c.delete("shoot")
         if now >= self.home_next_shoot:
             self.home_next_shoot = now + random.uniform(3, 9)
@@ -578,7 +618,7 @@ class App(tk.Tk):
 
         self.after(FRAME_MS, self.home_loop)
 
-    # ----- Sternschnuppen (für Home und Karte) -----
+    # ----- Shooting stars (home screen and map) -----
 
     @staticmethod
     def _new_shooting_star(w, h, now, x_off=0.0, y_off=0.0):
@@ -610,7 +650,7 @@ class App(tk.Tk):
         return True
 
     # ------------------------------------------------------------------
-    # Spielstart
+    # Game start
     # ------------------------------------------------------------------
 
     def start_game(self):
@@ -633,23 +673,23 @@ class App(tk.Tk):
                 lines = [f"  {MATERIALS[m]['emoji']} {m}: +{fmt(v)}" for m, v in top]
                 hours = min(elapsed, OFFLINE_CAP) / 3600
                 messagebox.showinfo(
-                    "Willkommen zurück!",
-                    f"Deine Station hat {fmt_rate(hours)} Stunden weitergearbeitet:\n\n"
+                    "Welcome back!",
+                    f"Your station kept working for {fmt_rate(hours)} hours:\n\n"
                     + "\n".join(lines), parent=self)
 
         self.credits_shown = float(self.game.credits)
         self.loop()
 
     # ------------------------------------------------------------------
-    # Spiel-Oberfläche
+    # Game UI
     # ------------------------------------------------------------------
 
     def build_game_ui(self):
-        # Kopfleiste als Canvas (für Credits-Pill)
+        # Header bar as a canvas (for the credits pill)
         hd = tk.Canvas(self, height=50, bg=HEADER_BG, highlightthickness=0)
         hd.pack(fill="x")
         self.header = hd
-        hd.create_text(16, 25, anchor="w", text="🚀 Raumstation Idle",
+        hd.create_text(16, 25, anchor="w", text="🚀 Space Station Idle",
                        font=("Segoe UI", 12, "bold"), fill=TEXT_DIM)
         self.header_pill = hd.create_polygon(
             round_rect_points(200, 10, 320, 40, 15),
@@ -662,7 +702,7 @@ class App(tk.Tk):
             font=("Segoe UI", 10, "bold"), fill=GREEN)
         self.header_hint = hd.create_text(
             1260, 25, anchor="e",
-            text="Linksklick: Material öffnen   |   Rechtsklick + Ziehen: Karte verschieben",
+            text="Left-click: open material   |   Right-click + drag: move the map",
             font=("Segoe UI", 10), fill=blend(TEXT_DIM, HEADER_BG, 0.25))
         hd.bind("<Configure>",
                 lambda e: hd.coords(self.header_hint, e.width - 16, 25))
@@ -685,7 +725,7 @@ class App(tk.Tk):
         self.make_background()
 
     def make_background(self):
-        """Nebel + Sternenhintergrund — einmal erzeugt, twinkelt pro Frame."""
+        """Nebulae + starfield — created once, twinkles every frame."""
         c = self.canvas
         add_nebula(c, 150, 350, 360, 230, "#2c2158")
         add_nebula(c, 1500, 520, 420, 260, "#1c3a5e")
@@ -708,13 +748,13 @@ class App(tk.Tk):
             })
 
     # ------------------------------------------------------------------
-    # Seitenpanel — komplett Canvas-gezeichnet, gleitet von rechts herein
+    # Side panel — fully canvas-drawn, slides in from the right
     # ------------------------------------------------------------------
 
     def build_panel(self, parent):
         p = tk.Canvas(parent, bg=PANEL_BG, width=PANEL_W, highlightthickness=0)
         self.panel = p
-        # Eingabefeld als eingebettetes Widget (bleibt dauerhaft bestehen)
+        # Input field as an embedded widget (persists permanently)
         self.sell_entry = tk.Entry(p, font=("Segoe UI", 11), bg="#0b1220",
                                    fg="white", insertbackground="white",
                                    relief="flat", justify="center")
@@ -749,7 +789,7 @@ class App(tk.Tk):
                 return
 
     def _start_panel_anim(self, to):
-        """Startet das Hinein-/Hinausgleiten des Panels (eigene schnelle Schleife)."""
+        """Starts the panel slide in/out (its own fast loop)."""
         if self.panel_anim is None and self.panel_offset == to and \
                 self.panel_visible == (to == 0):
             return
@@ -757,14 +797,14 @@ class App(tk.Tk):
             self.panel_visible = True
             self.panel.place(relx=1.0, rely=0, relheight=1.0, anchor="ne",
                              x=round(self.panel_offset))
-            tk.Misc.tkraise(self.panel)  # Canvas.lift() würde Canvas-Items meinen
+            tk.Misc.tkraise(self.panel)  # Canvas.lift() would mean canvas items
         anim = {"from": self.panel_offset, "to": to, "t0": time.monotonic()}
         self.panel_anim = anim
         self._panel_anim_step(anim)
 
     def _panel_anim_step(self, anim):
         if self.panel_anim is not anim:
-            return  # von einer neueren Animation abgelöst
+            return  # superseded by a newer animation
         duration = 0.3
         prog = (time.monotonic() - anim["t0"]) / duration
         eased = ease_out(prog)
@@ -773,7 +813,7 @@ class App(tk.Tk):
         if prog >= 1.0:
             self.panel_offset = anim["to"]
             self.panel_anim = None
-            if anim["to"] >= PANEL_W:  # vollständig hinausgeglitten
+            if anim["to"] >= PANEL_W:  # fully slid out
                 self.panel.place_forget()
                 self.panel_visible = False
                 self.selected_mat = None
@@ -798,11 +838,11 @@ class App(tk.Tk):
         ph = p.winfo_height()
         hover_any = False
 
-        # Hintergrund-Akzente
+        # Background accents
         p.create_rectangle(ox, 0, ox + PANEL_W, 4, fill=accent, outline="", tags="dyn")
         p.create_line(ox, 0, ox, ph, fill="#22315c", width=2, tags="dyn")
 
-        # Kopf: Badge + Name + Schließen
+        # Header: badge + name + close
         bx, by, br = ox + 32, 36, 17
         p.create_oval(bx - br, by - br, bx + br, by + br,
                       fill=blend(accent, PANEL_BG, 0.75),
@@ -815,17 +855,17 @@ class App(tk.Tk):
                                        self.close_panel, PANEL_BG, "#243153",
                                        font=("Segoe UI", 12))
 
-        # --- Lager-Karte ---
+        # --- Storage card ---
         p.create_polygon(round_rect_points(ox + 14, 64, ox + 306, 148, 12),
                          smooth=True, fill=PANEL_CARD,
                          outline=blend(accent, PANEL_BG, 0.6), tags="dyn")
-        p.create_text(ox + 28, 82, anchor="w", text="LAGER",
+        p.create_text(ox + 28, 82, anchor="w", text="STORAGE",
                       font=("Segoe UI", 8, "bold"),
                       fill=blend(TEXT_DIM, PANEL_BG, 0.2), tags="dyn")
         p.create_text(ox + 28, 106, anchor="w", text=fmt(g.stock[mat]),
                       font=("Segoe UI", 19, "bold"), fill=TEXT_MAIN, tags="dyn")
         p.create_text(ox + 28, 132, anchor="w",
-                      text=f"Wert: {fmt(info['price'])} Cr/Stück",
+                      text=f"Value: {fmt(info['price'])} Cr each",
                       font=("Segoe UI", 9), fill=GOLD, tags="dyn")
         prod = g.rate_produced(mat)
         cons = g.rate_consumed(mat)
@@ -836,28 +876,28 @@ class App(tk.Tk):
                       fill=RED if cons > 0 else blend(TEXT_DIM, PANEL_BG, 0.4),
                       tags="dyn")
 
-        # --- Verkaufen-Karte ---
+        # --- Sell card ---
         p.create_polygon(round_rect_points(ox + 14, 160, ox + 306, 268, 12),
                          smooth=True, fill=PANEL_CARD,
                          outline="#22315c", tags="dyn")
-        p.create_text(ox + 28, 178, anchor="w", text="VERKAUFEN",
+        p.create_text(ox + 28, 178, anchor="w", text="SELL",
                       font=("Segoe UI", 8, "bold"),
                       fill=blend(TEXT_DIM, PANEL_BG, 0.2), tags="dyn")
         p.coords(self.panel_entry_win, ox + 28, 192)
         p.itemconfigure(self.panel_entry_win, state="normal")
-        hover_any |= self.panel_button(ox + 124, 192, ox + 292, 220, "Verkaufen",
+        hover_any |= self.panel_button(ox + 124, 192, ox + 292, 220, "Sell",
                                        self.sell_amount, "#2563eb", "#3b82f6")
         third = (292 - 28 - 12) / 3
         for i, (label, cb) in enumerate((
                 ("10", lambda: self._sell_feedback(g.sell(mat, 10))),
-                ("Hälfte", lambda: self._sell_feedback(g.sell(mat, g.stock[mat] // 2))),
-                ("Alles", lambda: self._sell_feedback(g.sell(mat, g.stock[mat]))))):
+                ("Half", lambda: self._sell_feedback(g.sell(mat, g.stock[mat] // 2))),
+                ("All", lambda: self._sell_feedback(g.sell(mat, g.stock[mat]))))):
             bx1 = ox + 28 + i * (third + 6)
             hover_any |= self.panel_button(bx1, 230, bx1 + third, 256, label, cb,
                                            "#1d2a4d", "#27395f",
                                            font=("Segoe UI", 9, "bold"))
 
-        # --- Gebäude-Karte ---
+        # --- Building card ---
         credits_cost, mats = g.cost_of(bname)
         n_lines = 1 + len(mats)
         cost_y0 = 372
@@ -866,7 +906,7 @@ class App(tk.Tk):
         p.create_polygon(round_rect_points(ox + 14, 280, ox + 306, card_y2, 12),
                          smooth=True, fill=PANEL_CARD,
                          outline="#22315c", tags="dyn")
-        p.create_text(ox + 28, 298, anchor="w", text="GEBÄUDE",
+        p.create_text(ox + 28, 298, anchor="w", text="BUILDING",
                       font=("Segoe UI", 8, "bold"),
                       fill=blend(TEXT_DIM, PANEL_BG, 0.2), tags="dyn")
         p.create_text(ox + 28, 320, anchor="w", text=bname,
@@ -874,9 +914,9 @@ class App(tk.Tk):
         p.create_text(ox + 292, 320, anchor="e", text=f"{g.counts[bname]}×",
                       font=("Segoe UI", 12, "bold"), fill=TEXT_MAIN, tags="dyn")
         p.create_text(ox + 28, 340, anchor="w",
-                      text=f"Produziert 1 {mat} alle {fmt_rate(INTERVAL)}s",
+                      text=f"Produces 1 {mat} every {fmt_rate(INTERVAL)}s",
                       font=("Segoe UI", 9), fill=TEXT_DIM, tags="dyn")
-        p.create_text(ox + 28, 360, anchor="w", text="KOSTEN",
+        p.create_text(ox + 28, 360, anchor="w", text="COST",
                       font=("Segoe UI", 8, "bold"),
                       fill=blend(TEXT_DIM, PANEL_BG, 0.2), tags="dyn")
 
@@ -898,13 +938,13 @@ class App(tk.Tk):
 
         affordable = g.can_afford(bname)
         hover_any |= self.panel_button(ox + 28, btn_y, ox + 292, btn_y + 36,
-                                       "Kaufen", self.buy, "#16a34a", "#22c55e",
+                                       "Buy", self.buy, "#16a34a", "#22c55e",
                                        enabled=affordable,
                                        font=("Segoe UI", 11, "bold"))
 
         p.config(cursor="hand2" if hover_any else "")
 
-    # ----- Eingaben (Karte) -----
+    # ----- Input (map) -----
 
     def on_mouse_move(self, event):
         self.mouse_widget = (event.x, event.y)
@@ -916,7 +956,7 @@ class App(tk.Tk):
             if x1 <= cx <= x2 and y1 <= cy <= y2:
                 self.select_mat(mat)
                 return
-        self.close_panel()  # Klick ins Leere schließt das Panel
+        self.close_panel()  # clicking empty space closes the panel
 
     def select_mat(self, mat):
         self.selected_mat = mat
@@ -927,7 +967,7 @@ class App(tk.Tk):
         if self.panel_visible:
             self._start_panel_anim(PANEL_W)
 
-    # ----- Aktionen -----
+    # ----- Actions -----
 
     def spawn_float(self, x, y, text, color):
         if len(self.floats) < 20:
@@ -953,12 +993,12 @@ class App(tk.Tk):
             return
         if self.game.buy(PRODUCER[self.selected_mat]):
             x, y = MATERIALS[self.selected_mat]["pos"]
-            self.spawn_float(x + NODE_W / 2, y + 14, "+1 Gebäude",
+            self.spawn_float(x + NODE_W / 2, y + 14, "+1 building",
                              MATERIALS[self.selected_mat]["color"])
             self.flash[self.selected_mat] = time.monotonic()
 
     # ------------------------------------------------------------------
-    # Hauptschleife
+    # Main loop
     # ------------------------------------------------------------------
 
     def loop(self):
@@ -979,7 +1019,7 @@ class App(tk.Tk):
         self.after(FRAME_MS, self.loop)
 
     # ------------------------------------------------------------------
-    # Zeichnen
+    # Drawing
     # ------------------------------------------------------------------
 
     def draw(self):
@@ -989,7 +1029,7 @@ class App(tk.Tk):
         c.delete("dyn")
         self.node_rects = []
 
-        # Credits zählen weich hoch/runter
+        # Credits count up/down smoothly
         self.credits_shown += (g.credits - self.credits_shown) * min(1.0, self.dt * 8)
         if abs(g.credits - self.credits_shown) < 1:
             self.credits_shown = float(g.credits)
@@ -1001,20 +1041,20 @@ class App(tk.Tk):
             hd.coords(self.header_pill,
                       *round_rect_points(bb[0] - 14, 9, bb[2] + 14, 41, 16))
 
-        # Hinweis sobald ein Update fertig heruntergeladen wurde
+        # Notice once an update has finished downloading
         if not self.update_note_shown and \
-                self.update_info.get("status") == "installiert":
+                self.update_info.get("status") == "installed":
             self.update_note_shown = True
             hd.itemconfig(self.header_update,
                           text=f"⬆ Update v{self.update_info.get('version')} "
-                               f"geladen — aktiv nach Neustart")
+                               f"downloaded — active after restart")
 
-        # Sterne twinkeln
+        # Stars twinkle
         for s in self.stars:
             b = s["base"] * (0.55 + 0.45 * math.sin(t * s["speed"] + s["phase"]))
             c.itemconfig(s["item"], fill=blend(BG, "#bcd0f0", b))
 
-        # Sichtbarer Kartenausschnitt (für Culling)
+        # Visible map area (for culling)
         vw = c.winfo_width()
         vh = c.winfo_height()
         vx1, vy1 = c.canvasx(0) - 60, c.canvasy(0) - 60
@@ -1022,7 +1062,7 @@ class App(tk.Tk):
 
         visible = {m for m in MATERIALS if g.material_visible(m)}
 
-        # Neu freigeschaltete Knoten -> Einblend-Animation
+        # Newly unlocked nodes -> reveal animation
         if self.seen_visible is None:
             self.seen_visible = set(visible)
         else:
@@ -1030,7 +1070,7 @@ class App(tk.Tk):
                 self.unlock_anim[mat] = t
             self.seen_visible = set(visible)
 
-        # Hover ermitteln
+        # Determine hover
         self.hover_mat = None
         if self.mouse_widget is not None:
             mx = c.canvasx(self.mouse_widget[0])
@@ -1042,7 +1082,7 @@ class App(tk.Tk):
                     break
         c.config(cursor="hand2" if self.hover_mat else "")
 
-        # Verbindungslinien (Glow + Pfeilspitze) + Material-Punkte mit Schweif
+        # Connection lines (glow + arrowhead) + flowing material dots with tail
         for bname, b in BUILDINGS.items():
             out = b["output"]
             if out not in visible:
@@ -1062,7 +1102,7 @@ class App(tk.Tk):
                 ax, ay = p3
                 c.create_polygon(ax, ay - 1, ax - 5, ay - 9, ax + 5, ay - 9,
                                  fill=bright, outline="", tags="dyn")
-                # Punkt mit Schweif wandert im Takt des Produktionszyklus
+                # Dot with tail travels in sync with the production cycle
                 if g.counts[bname] > 0:
                     phs = (g.timers[bname] / INTERVAL) % 1.0
                     for back, r, dim in ((0.0, 4.0, 0.0), (0.05, 2.8, 0.45),
@@ -1074,14 +1114,14 @@ class App(tk.Tk):
                         c.create_oval(px - r, py - r, px + r, py + r,
                                       fill=blend(col, BG, dim), outline="", tags="dyn")
 
-        # Knoten (nur im sichtbaren Ausschnitt zeichnen)
+        # Nodes (only draw inside the visible area)
         for mat in visible:
             x, y = MATERIALS[mat]["pos"]
             if x + NODE_W < vx1 or x > vx2 or y + NODE_H < vy1 or y > vy2:
                 continue
             self.draw_node(mat, t)
 
-        # Produktions-Ereignisse -> schwebende "+n"-Texte + Aufleuchten
+        # Production events -> floating "+n" texts + flash
         for out, p in g.events:
             if out in visible:
                 self.flash[out] = t
@@ -1102,7 +1142,7 @@ class App(tk.Tk):
             alive.append(fl)
         self.floats = alive
 
-        # Sternschnuppen über der Karte
+        # Shooting stars across the map
         if self.next_shoot == 0.0:
             self.next_shoot = t + random.uniform(5, 14)
         if t >= self.next_shoot:
@@ -1111,7 +1151,7 @@ class App(tk.Tk):
         self.shooting = [s for s in self.shooting
                          if self._draw_shooting_star(c, s, t, "dyn")]
 
-        # Panel schließen falls das Material nicht mehr sichtbar ist
+        # Close the panel if the material is no longer visible
         if self.selected_mat is not None and self.selected_mat not in visible:
             self.close_panel()
         self.draw_panel(t)
@@ -1124,7 +1164,7 @@ class App(tk.Tk):
         bname = PRODUCER[mat]
         accent = info["color"]
 
-        # Einblend-Animation: Karte wächst aus der Mitte
+        # Reveal animation: card grows from the center
         s = 1.0
         if mat in self.unlock_anim:
             age = (t - self.unlock_anim[mat]) / 0.45
@@ -1155,7 +1195,7 @@ class App(tk.Tk):
             fill = CARD
             width = 1.5
 
-        # Aufleuchten bei fertiger Produktion
+        # Flash when production finishes
         if mat in self.flash:
             fage = (t - self.flash[mat]) / 0.45
             if fage >= 1.0:
@@ -1168,15 +1208,15 @@ class App(tk.Tk):
                    fill=SHADOW, outline="", tags="dyn")
         round_rect(c, x1, y1, x2, y2, 14,
                    fill=fill, outline=outline, width=width, tags="dyn")
-        # dezenter Lichtschein an der Oberkante
+        # subtle highlight along the top edge
         c.create_line(x1 + 14, y1 + 2, x2 - 14, y1 + 2,
                       fill=blend(fill, "#ffffff", 0.12), tags="dyn")
         self.node_rects.append((x, y, x + NODE_W, y + NODE_H, mat))
 
         if s < 0.92:
-            return  # Inhalt erst zeigen, wenn die Karte fast voll aufgeklappt ist
+            return  # only show content once the card is almost fully grown
 
-        # Icon-Badge
+        # Icon badge
         bx, by, br = x + 27, y + 26, 15
         c.create_oval(bx - br, by - br, bx + br, by + br,
                       fill=blend(accent, BG, 0.78),
@@ -1187,7 +1227,7 @@ class App(tk.Tk):
         c.create_text(x + 50, y + 26, anchor="w", text=mat,
                       font=("Segoe UI", 11, "bold"), fill=accent, tags="dyn")
 
-        # Lagerbestand groß, Raten rechts gestapelt
+        # Stock large, rates stacked on the right
         c.create_text(x + 14, y + 58, anchor="w",
                       text=fmt(g.stock[mat]),
                       font=("Segoe UI", 15, "bold"), fill=TEXT_MAIN, tags="dyn")
@@ -1201,7 +1241,7 @@ class App(tk.Tk):
                       font=("Segoe UI", 9),
                       fill=RED if cons > 0 else blend(TEXT_DIM, BG, 0.4), tags="dyn")
 
-        # Gebäudezeile + Restzeit
+        # Building line + time remaining
         c.create_text(x + 14, y + 81, anchor="w",
                       text=f"{g.counts[bname]}× {bname}",
                       font=("Segoe UI", 9), fill=TEXT_DIM, tags="dyn")
@@ -1211,7 +1251,7 @@ class App(tk.Tk):
                           text=f"{fmt_rate(rest)}s",
                           font=("Segoe UI", 9), fill=TEXT_DIM, tags="dyn")
 
-        # Fortschrittsbalken mit Leuchtpunkt an der Spitze
+        # Progress bar with a glowing tip
         frac = min(1.0, g.timers[bname] / INTERVAL)
         bar_x, bar_y = x + 14, y + 96
         bar_w, bar_h = NODE_W - 28, 9
@@ -1233,7 +1273,7 @@ class App(tk.Tk):
                               outline="", tags="dyn")
 
     # ------------------------------------------------------------------
-    # Beenden
+    # Shutdown
     # ------------------------------------------------------------------
 
     def on_close(self):

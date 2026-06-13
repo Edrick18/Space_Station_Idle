@@ -1,37 +1,38 @@
-# 🚀 Raumstation Idle
+# 🚀 Space Station Idle
 
-Ein Idle/Incremental-Spiel mit Raumstation-Thema: Baue eine industrielle
-Produktionskette auf — von einfachen Rohstoffen bis zum Basisroboter.
+An idle/incremental game about building an industrial production chain in
+space — from simple raw resources all the way up to basic robots.
 
-Läuft komplett offline mit Python + tkinter, keine zusätzlichen Pakete nötig.
+Runs fully offline with Python + tkinter, no extra packages required.
 
-## Spielen
+## Play
 
 ```
-python raumstation_idle.py
+python space_station_idle.py
 ```
 
-- **Linksklick** auf ein Material öffnet das Seitenpanel (Verkaufen / Gebäude kaufen)
-- **Rechtsklick + Ziehen** verschiebt die Karte
-- Der Spielstand wird automatisch in `savegame.json` gespeichert
-- **Offline-Produktion:** Gebäude arbeiten weiter, während das Spiel geschlossen ist (max. 24 Stunden werden nachberechnet)
+- **Left-click** a material to open the side panel (sell / buy buildings)
+- **Right-click + drag** to move around the map
+- Progress is saved automatically to `savegame.json`
+- **Offline production:** buildings keep working while the game is closed
+  (up to 24 hours are simulated on the next launch)
 
-## Auto-Update
+## Auto-update
 
-Beim Start prüft das Spiel im Hintergrund, ob in diesem Repository eine
-neuere Version liegt (`version.json`). Wenn ja, wird `raumstation_idle.py`
-automatisch heruntergeladen und ist **beim nächsten Start** aktiv.
+On startup the game checks this repository in the background for a newer
+version (`version.json`). If one exists, `space_station_idle.py` is
+downloaded automatically and becomes active **on the next launch**.
 
-**Updates sind nie Pflicht:** Ohne Internet, ohne gefundenes Update oder bei
-irgendeinem Fehler startet das Spiel einfach ganz normal mit der vorhandenen
-Version. Der Spielstand bleibt bei Updates immer erhalten.
+**Updates are never mandatory:** without internet, without an update, or on
+any error the game simply starts normally with the version you have. Your
+save file is never touched by updates.
 
-## Ein Update veröffentlichen
+## Publishing an update
 
-1. Änderungen in `raumstation_idle.py` machen
-2. Die Konstante `VERSION` in `raumstation_idle.py` erhöhen (z.B. `"1.1.0"`)
-3. Die gleiche Nummer in `version.json` eintragen
-4. Committen und pushen:
+1. Make your changes in `space_station_idle.py`
+2. Bump the `VERSION` constant in `space_station_idle.py` (e.g. `"1.1.0"`)
+3. Put the same number into `version.json`
+4. Commit and push:
 
 ```
 git add -A
@@ -39,9 +40,10 @@ git commit -m "Update v1.1.0"
 git push
 ```
 
-Alle Spieler bekommen das Update automatisch beim nächsten Spielstart.
+Every player receives the update automatically the next time they start
+the game.
 
 ## Design
 
-Das vollständige Game-Design-Dokument liegt in
+The full game design document (in German) lives in
 [raumstation_idle_design.md](raumstation_idle_design.md).
