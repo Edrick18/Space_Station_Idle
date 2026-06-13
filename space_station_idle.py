@@ -160,7 +160,7 @@ for _name, _b in BUILDINGS.items():
 EXTRACTION_MATERIAL_COST = 25
 
 NODE_W = 235
-NODE_H = 118
+NODE_H = 148
 
 # Old German save files (game was originally written in German) are
 # migrated transparently on load so no progress is ever lost.
@@ -247,8 +247,9 @@ def connection_curve(inp, out):
     ox, oy = MATERIALS[out]["pos"]
     p0 = (ix + NODE_W / 2, iy + NODE_H)
     p3 = (ox + NODE_W / 2, oy)
-    p1 = (p0[0], p0[1] + 55)
-    p2 = (p3[0], p3[1] - 55)
+    ctrl = max(18, (p3[1] - p0[1]) * 0.38)
+    p1 = (p0[0], p0[1] + ctrl)
+    p2 = (p3[0], p3[1] - ctrl)
     return p0, p1, p2, p3
 
 
@@ -1498,33 +1499,48 @@ class App(tk.Tk):
         c.create_text(x + 50, y + 26, anchor="w", text=mat,
                       font=("Segoe UI", 11, "bold"), fill=accent, tags="dyn")
 
+        # Input requirements row
+        b = BUILDINGS[bname]
+        if b["extraction"]:
+            inp_text = "raw resource"
+            inp_color = blend(TEXT_DIM, BG, 0.35)
+        elif b["inputs"]:
+            inp_text = "  +  ".join(f"{INPUT_RATIO}× {m}" for m in b["inputs"])
+            inp_color = TEXT_DIM
+        else:
+            inp_text = ""
+            inp_color = TEXT_DIM
+        if inp_text:
+            c.create_text(x + 14, y + 47, anchor="w", text=inp_text,
+                          font=("Segoe UI", 9), fill=inp_color, tags="dyn")
+
         # Stock large, rates stacked on the right
-        c.create_text(x + 14, y + 58, anchor="w",
+        c.create_text(x + 14, y + 76, anchor="w",
                       text=fmt(g.stock[mat]),
                       font=("Segoe UI", 15, "bold"), fill=TEXT_MAIN, tags="dyn")
         prod = g.rate_produced(mat)
         cons = g.rate_consumed(mat)
-        c.create_text(x + NODE_W - 14, y + 50, anchor="e",
+        c.create_text(x + NODE_W - 14, y + 66, anchor="e",
                       text=f"+{fmt_rate(prod)}/s",
                       font=("Segoe UI", 9), fill=GREEN, tags="dyn")
-        c.create_text(x + NODE_W - 14, y + 65, anchor="e",
+        c.create_text(x + NODE_W - 14, y + 81, anchor="e",
                       text=f"-{fmt_rate(cons)}/s",
                       font=("Segoe UI", 9),
                       fill=RED if cons > 0 else blend(TEXT_DIM, BG, 0.4), tags="dyn")
 
         # Building line + time remaining
-        c.create_text(x + 14, y + 81, anchor="w",
+        c.create_text(x + 14, y + 101, anchor="w",
                       text=f"{g.counts[bname]}× {bname}",
                       font=("Segoe UI", 9), fill=TEXT_DIM, tags="dyn")
         if g.counts[bname] > 0:
             rest = max(0.0, INTERVAL - g.timers[bname])
-            c.create_text(x + NODE_W - 14, y + 81, anchor="e",
+            c.create_text(x + NODE_W - 14, y + 101, anchor="e",
                           text=f"{fmt_rate(rest)}s",
                           font=("Segoe UI", 9), fill=TEXT_DIM, tags="dyn")
 
         # Progress bar with a glowing tip
         frac = min(1.0, g.timers[bname] / INTERVAL)
-        bar_x, bar_y = x + 14, y + 96
+        bar_x, bar_y = x + 14, y + 116
         bar_w, bar_h = NODE_W - 28, 9
         round_rect(c, bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, 4,
                    fill=BG, outline=blend(accent, BG, 0.7), tags="dyn")
