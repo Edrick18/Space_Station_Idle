@@ -24,7 +24,7 @@ BASE_DIR = os.path.dirname(sys.executable if IS_FROZEN
                            else os.path.abspath(__file__))
 SAVE_FILE = os.path.join(BASE_DIR, "savegame.json")
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # --- Auto-update via GitHub (optional — fails silently) ---
 # On startup a background thread checks whether a newer version exists.
@@ -257,13 +257,14 @@ def version_tuple(s):
 
 
 def check_for_update(result):
-    """Checks GitHub for a newer version and downloads it.
+    """Checks GitHub whether a newer version exists (no download yet).
 
     Runs in a background thread. Every error (no internet, repository
-    unreachable, broken download, ...) is swallowed — the game then simply
-    keeps running with the current version. `result` is filled with:
-      status: "unconfigured" | "up-to-date" | "installed" | "offline"
-      version: the new version number (only when "installed")
+    unreachable, ...) is swallowed — the game then simply keeps running
+    with the current version. `result` is filled with:
+      status: "unconfigured" | "up-to-date" | "update-available" | "offline"
+      version: the new version number (only when "update-available")
+      url:     exe download url (exe mode only)
     """
     if "DEIN-GITHUB" in UPDATE_USER or not UPDATE_USER:
         result["status"] = "unconfigured"
@@ -278,7 +279,7 @@ def check_for_update(result):
 
 
 def _check_script_update(result):
-    """Running from source: fetch version.json and the new script."""
+    """Running from source: compare against version.json in the repo."""
     import urllib.request
     base = (f"https://raw.githubusercontent.com/"
             f"{UPDATE_USER}/{UPDATE_REPO}/{UPDATE_BRANCH}/")
@@ -288,30 +289,12 @@ def _check_script_update(result):
     if version_tuple(remote) <= version_tuple(VERSION):
         result["status"] = "up-to-date"
         return
-
-    with urllib.request.urlopen(base + UPDATE_FILE, timeout=20) as r:
-        code = r.read()
-    text = code.decode("utf-8")
-    # Sanity check so a broken file is never installed
-    if "class Game" not in text or "VERSION" not in text or len(text) < 5000:
-        result["status"] = "offline"
-        return
-
-    target = os.path.join(BASE_DIR, UPDATE_FILE)
-    tmp = target + ".new"
-    with open(tmp, "wb") as f:
-        f.write(code)
-    os.replace(tmp, target)
     result["version"] = remote
-    result["status"] = "installed"
+    result["status"] = "update-available"
 
 
 def _check_exe_update(result):
-    """Running as exe: fetch the latest GitHub release and download the exe.
-
-    The new exe is stored next to the running one as '<exe>.new' and is
-    swapped in by apply_pending_exe_update() on the next launch.
-    """
+    """Running as exe: compare against the latest GitHub release tag."""
     import urllib.request
     api = (f"https://api.github.com/repos/"
            f"{UPDATE_USER}/{UPDATE_REPO}/releases/latest")
@@ -322,41 +305,86 @@ def _check_exe_update(result):
     if version_tuple(remote) <= version_tuple(VERSION):
         result["status"] = "up-to-date"
         return
-
-    url = None
     for asset in info.get("assets", []):
         if asset.get("name") == EXE_NAME:
-            url = asset.get("browser_download_url")
-            break
-    if not url:
-        result["status"] = "offline"
-        return
+            result["version"] = remote.lstrip("v")
+            result["url"] = asset.get("browser_download_url")
+            result["status"] = "update-available"
+            return
+    result["status"] = "up-to-date"  # release without exe -> nothing to do
 
-    req = urllib.request.Request(url, headers={"User-Agent": EXE_NAME})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        data = r.read()
-    # Sanity check: must be a Windows executable of plausible size
-    if len(data) < 1_000_000 or not data.startswith(b"MZ"):
-        result["status"] = "offline"
-        return
 
-    new_path = sys.executable + ".new"
-    part = new_path + ".part"
-    with open(part, "wb") as f:
-        f.write(data)
-    os.replace(part, new_path)
-    result["version"] = remote.lstrip("v")
-    result["status"] = "installed"
+def download_update(info):
+    """Downloads the accepted update. Sets status to 'downloaded' on
+    success, 'download-failed' otherwise. Runs in a background thread."""
+    import urllib.request
+    try:
+        if IS_FROZEN:
+            req = urllib.request.Request(info["url"],
+                                         headers={"User-Agent": EXE_NAME})
+            with urllib.request.urlopen(req, timeout=120) as r:
+                data = r.read()
+            # Sanity check: must be a Windows executable of plausible size
+            if len(data) < 1_000_000 or not data.startswith(b"MZ"):
+                info["status"] = "download-failed"
+                return
+            new_path = sys.executable + ".new"
+            part = new_path + ".part"
+            with open(part, "wb") as f:
+                f.write(data)
+            os.replace(part, new_path)
+        else:
+            base = (f"https://raw.githubusercontent.com/"
+                    f"{UPDATE_USER}/{UPDATE_REPO}/{UPDATE_BRANCH}/")
+            with urllib.request.urlopen(base + UPDATE_FILE, timeout=20) as r:
+                code = r.read()
+            text = code.decode("utf-8")
+            # Sanity check so a broken file is never installed
+            if "class Game" not in text or "VERSION" not in text or len(text) < 5000:
+                info["status"] = "download-failed"
+                return
+            target = os.path.join(BASE_DIR, UPDATE_FILE)
+            tmp = target + ".dl"
+            with open(tmp, "wb") as f:
+                f.write(code)
+            os.replace(tmp, target)
+        info["status"] = "downloaded"
+    except Exception:
+        info["status"] = "download-failed"
+
+
+def restart_into_update():
+    """Relaunches the game on the freshly downloaded version.
+
+    Returns False if the restart could not be performed (the game then
+    simply keeps running on the current version).
+    """
+    try:
+        if IS_FROZEN:
+            # A running exe cannot overwrite itself, but it CAN be renamed:
+            # move the running exe aside, put the update in its place.
+            exe = sys.executable
+            old, new = exe + ".old", exe + ".new"
+            try:
+                if os.path.exists(old):
+                    os.remove(old)
+            except OSError:
+                pass
+            os.rename(exe, old)
+            os.rename(new, exe)
+            subprocess.Popen([exe], close_fds=True)
+        else:
+            target = os.path.join(BASE_DIR, UPDATE_FILE)
+            subprocess.Popen([sys.executable, target], close_fds=True)
+    except OSError:
+        return False
+    os._exit(0)
 
 
 def apply_pending_exe_update():
-    """Swaps in a downloaded exe update and relaunches (exe mode only).
-
-    A running exe cannot overwrite itself, but it CAN be renamed. So:
-    rename the running exe aside, move the update into place, start the
-    new exe and exit. Leftover '.old' files are cleaned up on later runs.
-    On any error the game simply starts with the current version.
-    """
+    """Startup safety net (exe mode only): cleans up leftover '.old' files
+    and swaps in a '.new' exe that was downloaded but never applied
+    (e.g. after a crash). On any error the game simply starts normally."""
     if not IS_FROZEN:
         return
     exe = sys.executable
@@ -595,6 +623,7 @@ class App(tk.Tk):
 
         # Update check in the background — never blocks the game
         self.update_info = {}
+        self.update_prompted = False
         self.update_note_shown = False
         threading.Thread(target=check_for_update,
                          args=(self.update_info,), daemon=True).start()
@@ -668,6 +697,9 @@ class App(tk.Tk):
     def home_loop(self):
         if not self.home_active:
             return
+        self._poll_update()
+        if not self.home_active:
+            return  # the update prompt may have triggered a restart
         c = self.home_canvas
         now = time.monotonic()
         t = now - self.home_t0
@@ -708,6 +740,52 @@ class App(tk.Tk):
                            if self._draw_shooting_star(c, s, now, "shoot")]
 
         self.after(FRAME_MS, self.home_loop)
+
+    # ------------------------------------------------------------------
+    # Update flow: ask the player, download, restart on the new version
+    # ------------------------------------------------------------------
+
+    def _poll_update(self):
+        """Called from both the home loop and the game loop."""
+        info = self.update_info
+        status = info.get("status")
+
+        if status == "update-available" and not self.update_prompted:
+            self.update_prompted = True
+            v = info.get("version", "?")
+            if messagebox.askyesno(
+                    "Update available",
+                    f"Version {v} of Space Station Idle is available.\n\n"
+                    f"Download and restart now?\n\n"
+                    f"Choosing 'No' simply keeps the current version "
+                    f"(v{VERSION}) — you can keep playing normally.",
+                    parent=self):
+                info["status"] = "downloading"
+                self._show_update_note(f"⬇ Downloading update v{v} ...")
+                threading.Thread(target=download_update,
+                                 args=(info,), daemon=True).start()
+            else:
+                info["status"] = "declined"
+
+        elif status == "downloaded":
+            info["status"] = "installing"
+            if self.running:
+                self.game.save()  # never lose progress on restart
+            if not restart_into_update():
+                info["status"] = "failed"
+                self._show_update_note(
+                    "⚠ Update failed — playing the current version")
+
+        elif status == "download-failed" and not self.update_note_shown:
+            self.update_note_shown = True
+            self._show_update_note(
+                "⚠ Update download failed — playing the current version")
+
+    def _show_update_note(self, text):
+        """Shows a note in the header (in-game) — silently skipped on the
+        home screen, where the restart follows within moments anyway."""
+        if hasattr(self, "header"):
+            self.header.itemconfig(self.header_update, text=text)
 
     # ----- Shooting stars (home screen and map) -----
 
@@ -1099,6 +1177,7 @@ class App(tk.Tk):
         self.dt = now - self.last_time
         self.last_time = now
 
+        self._poll_update()
         self.game.tick(self.dt)
 
         self.autosave_timer += self.dt
@@ -1131,14 +1210,6 @@ class App(tk.Tk):
         if bb:
             hd.coords(self.header_pill,
                       *round_rect_points(bb[0] - 14, 9, bb[2] + 14, 41, 16))
-
-        # Notice once an update has finished downloading
-        if not self.update_note_shown and \
-                self.update_info.get("status") == "installed":
-            self.update_note_shown = True
-            hd.itemconfig(self.header_update,
-                          text=f"⬆ Update v{self.update_info.get('version')} "
-                               f"downloaded — active after restart")
 
         # Stars twinkle
         for s in self.stars:
