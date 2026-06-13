@@ -7,6 +7,13 @@ Runs fully offline with Python + tkinter, no extra packages required.
 
 ## Play
 
+**Windows (no Python needed):** download `SpaceStationIdle.exe` from the
+[latest release](https://github.com/Edrick18/Space_Station_Idle/releases/latest)
+and double-click it. Windows SmartScreen may warn about an unknown publisher
+on first launch — click "More info" → "Run anyway".
+
+**From source** (any OS with Python 3):
+
 ```
 python space_station_idle.py
 ```
@@ -19,9 +26,13 @@ python space_station_idle.py
 
 ## Auto-update
 
-On startup the game checks this repository in the background for a newer
-version (`version.json`). If one exists, `space_station_idle.py` is
-downloaded automatically and becomes active **on the next launch**.
+On startup the game checks GitHub in the background for a newer version:
+
+- **Exe:** compares the latest [release](https://github.com/Edrick18/Space_Station_Idle/releases)
+  tag, downloads the new `SpaceStationIdle.exe` and swaps it in on the
+  next launch.
+- **Source:** compares `version.json`, downloads the new
+  `space_station_idle.py`, active on the next launch.
 
 **Updates are never mandatory:** without internet, without an update, or on
 any error the game simply starts normally with the version you have. Your
@@ -39,6 +50,16 @@ git add -A
 git commit -m "Update v1.1.0"
 git push
 ```
+
+5. Build the exe and publish it as a GitHub release with tag `v1.1.0`
+   (same number as `VERSION`):
+
+```
+python -m PyInstaller --onefile --windowed --name SpaceStationIdle space_station_idle.py
+```
+
+Then create a release on GitHub with tag `v1.1.0` and attach
+`dist/SpaceStationIdle.exe` as an asset named exactly `SpaceStationIdle.exe`.
 
 Every player receives the update automatically the next time they start
 the game.

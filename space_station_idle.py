@@ -10,25 +10,34 @@ import math
 import os
 import random
 import re
+import subprocess
+import sys
 import threading
 import time
 import tkinter as tk
 from tkinter import messagebox
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# When packaged as an exe (PyInstaller), __file__ points into a temp folder —
+# the save file and updates must live next to the exe instead.
+IS_FROZEN = getattr(sys, "frozen", False)
+BASE_DIR = os.path.dirname(sys.executable if IS_FROZEN
+                           else os.path.abspath(__file__))
 SAVE_FILE = os.path.join(BASE_DIR, "savegame.json")
 
 VERSION = "1.0.0"
 
 # --- Auto-update via GitHub (optional — fails silently) ---
-# On startup a background thread checks whether a newer version exists in
-# the repository below. If so, it is downloaded and becomes active on the
-# next launch. Without internet, without an update, or on any error the
-# game simply keeps running — updates are never mandatory.
+# On startup a background thread checks whether a newer version exists.
+# Running as .py:  compares version.json in the repo, downloads the script.
+# Running as .exe: compares the latest GitHub release tag, downloads the exe
+#                  and swaps it in on the next launch.
+# Without internet, without an update, or on any error the game simply keeps
+# running — updates are never mandatory.
 UPDATE_USER = "Edrick18"
 UPDATE_REPO = "Space_Station_Idle"
 UPDATE_BRANCH = "main"
 UPDATE_FILE = "space_station_idle.py"
+EXE_NAME = "SpaceStationIdle.exe"
 
 INTERVAL = 5.0              # seconds per production cycle
 OFFLINE_CAP = 24 * 3600     # offline production capped at 24 hours
@@ -259,34 +268,116 @@ def check_for_update(result):
     if "DEIN-GITHUB" in UPDATE_USER or not UPDATE_USER:
         result["status"] = "unconfigured"
         return
+    try:
+        if IS_FROZEN:
+            _check_exe_update(result)
+        else:
+            _check_script_update(result)
+    except Exception:
+        result["status"] = "offline"
+
+
+def _check_script_update(result):
+    """Running from source: fetch version.json and the new script."""
     import urllib.request
     base = (f"https://raw.githubusercontent.com/"
             f"{UPDATE_USER}/{UPDATE_REPO}/{UPDATE_BRANCH}/")
-    try:
-        with urllib.request.urlopen(base + "version.json", timeout=6) as r:
-            info = json.loads(r.read().decode("utf-8"))
-        remote = str(info.get("version", "0"))
-        if version_tuple(remote) <= version_tuple(VERSION):
-            result["status"] = "up-to-date"
-            return
+    with urllib.request.urlopen(base + "version.json", timeout=6) as r:
+        info = json.loads(r.read().decode("utf-8"))
+    remote = str(info.get("version", "0"))
+    if version_tuple(remote) <= version_tuple(VERSION):
+        result["status"] = "up-to-date"
+        return
 
-        with urllib.request.urlopen(base + UPDATE_FILE, timeout=20) as r:
-            code = r.read()
-        text = code.decode("utf-8")
-        # Sanity check so a broken file is never installed
-        if "class Game" not in text or "VERSION" not in text or len(text) < 5000:
-            result["status"] = "offline"
-            return
-
-        target = os.path.join(BASE_DIR, UPDATE_FILE)
-        tmp = target + ".new"
-        with open(tmp, "wb") as f:
-            f.write(code)
-        os.replace(tmp, target)
-        result["version"] = remote
-        result["status"] = "installed"
-    except Exception:
+    with urllib.request.urlopen(base + UPDATE_FILE, timeout=20) as r:
+        code = r.read()
+    text = code.decode("utf-8")
+    # Sanity check so a broken file is never installed
+    if "class Game" not in text or "VERSION" not in text or len(text) < 5000:
         result["status"] = "offline"
+        return
+
+    target = os.path.join(BASE_DIR, UPDATE_FILE)
+    tmp = target + ".new"
+    with open(tmp, "wb") as f:
+        f.write(code)
+    os.replace(tmp, target)
+    result["version"] = remote
+    result["status"] = "installed"
+
+
+def _check_exe_update(result):
+    """Running as exe: fetch the latest GitHub release and download the exe.
+
+    The new exe is stored next to the running one as '<exe>.new' and is
+    swapped in by apply_pending_exe_update() on the next launch.
+    """
+    import urllib.request
+    api = (f"https://api.github.com/repos/"
+           f"{UPDATE_USER}/{UPDATE_REPO}/releases/latest")
+    req = urllib.request.Request(api, headers={"User-Agent": EXE_NAME})
+    with urllib.request.urlopen(req, timeout=6) as r:
+        info = json.loads(r.read().decode("utf-8"))
+    remote = str(info.get("tag_name", "0"))
+    if version_tuple(remote) <= version_tuple(VERSION):
+        result["status"] = "up-to-date"
+        return
+
+    url = None
+    for asset in info.get("assets", []):
+        if asset.get("name") == EXE_NAME:
+            url = asset.get("browser_download_url")
+            break
+    if not url:
+        result["status"] = "offline"
+        return
+
+    req = urllib.request.Request(url, headers={"User-Agent": EXE_NAME})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        data = r.read()
+    # Sanity check: must be a Windows executable of plausible size
+    if len(data) < 1_000_000 or not data.startswith(b"MZ"):
+        result["status"] = "offline"
+        return
+
+    new_path = sys.executable + ".new"
+    part = new_path + ".part"
+    with open(part, "wb") as f:
+        f.write(data)
+    os.replace(part, new_path)
+    result["version"] = remote.lstrip("v")
+    result["status"] = "installed"
+
+
+def apply_pending_exe_update():
+    """Swaps in a downloaded exe update and relaunches (exe mode only).
+
+    A running exe cannot overwrite itself, but it CAN be renamed. So:
+    rename the running exe aside, move the update into place, start the
+    new exe and exit. Leftover '.old' files are cleaned up on later runs.
+    On any error the game simply starts with the current version.
+    """
+    if not IS_FROZEN:
+        return
+    exe = sys.executable
+    old, new = exe + ".old", exe + ".new"
+    try:
+        if os.path.exists(old):
+            os.remove(old)  # leftover from a previous update
+    except OSError:
+        pass
+    if not os.path.exists(new):
+        return
+    try:
+        os.rename(exe, old)
+        os.rename(new, exe)
+    except OSError:
+        return  # try again next launch
+    try:
+        subprocess.Popen([exe], close_fds=True)
+        os._exit(0)
+    except OSError:
+        pass  # keep running the old version this one time
 
 
 def add_nebula(canvas, cx, cy, rx, ry, color):
@@ -1283,5 +1374,6 @@ class App(tk.Tk):
 
 
 if __name__ == "__main__":
+    apply_pending_exe_update()
     app = App()
     app.mainloop()

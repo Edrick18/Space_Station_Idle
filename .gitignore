@@ -10,5 +10,10 @@ __pycache__/
 _smoke_test.py
 _smoke_save.json
 
+# PyInstaller-Build
+build/
+dist/
+*.spec
+
 # Lokale Claude-Code-Einstellungen
 .claude/
