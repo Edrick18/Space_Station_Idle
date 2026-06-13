@@ -29,15 +29,6 @@ CHAIN_NAMES = {
 }
 
 
-def tier_of(mat, _cache={}):
-    if mat in _cache:
-        return _cache[mat]
-    inputs = game.BUILDINGS[game.PRODUCER[mat]]["inputs"]
-    t = 0 if not inputs else 1 + max(tier_of(i) for i in inputs)
-    _cache[mat] = t
-    return t
-
-
 def esc(s):
     return (str(s).replace("&", "&amp;").replace("<", "&lt;")
             .replace(">", "&gt;"))
@@ -88,7 +79,7 @@ def build_svg():
         bname = game.PRODUCER[mat]
         b = game.BUILDINGS[bname]
         used_by = game.CONSUMERS[mat]
-        tooltip = (f"{mat} (Tier {tier_of(mat)})\n"
+        tooltip = (f"{mat}\n"
                    f"Price: {info['price']} Cr\n"
                    f"Produced by: {bname}"
                    + (f"\nInputs: {', '.join(b['inputs'])}" if b["inputs"] else "")
@@ -105,7 +96,7 @@ def build_svg():
             f'font-size="15" font-weight="bold" font-family="Segoe UI">'
             f'{esc(info["emoji"])} {esc(mat)}</text>'
             f'<text x="{x + 14}" y="{y + 50}" fill="#fbbf24" font-size="12" '
-            f'font-family="Segoe UI">{info["price"]} Cr  ·  Tier {tier_of(mat)}</text>'
+            f'font-family="Segoe UI">{info["price"]} Cr</text>'
             f'<text x="{x + 14}" y="{y + 72}" fill="#8fa3c8" font-size="12" '
             f'font-family="Segoe UI">{esc(bname)}'
             f'{" (raw)" if b["extraction"] else ""}</text></g>')
@@ -116,7 +107,7 @@ def build_svg():
 
 def build_table():
     rows = []
-    mats = sorted(game.MATERIALS, key=lambda m: (tier_of(m), m))
+    mats = sorted(game.MATERIALS)
     for mat in mats:
         info = game.MATERIALS[mat]
         bname = game.PRODUCER[mat]
@@ -127,7 +118,7 @@ def build_table():
         inputs = ", ".join(b["inputs"]) if b["inputs"] else "—"
         rows.append(
             f"<tr><td><span style='color:{info['color']}'>{esc(info['emoji'])} "
-            f"<b>{esc(mat)}</b></span></td><td>{tier_of(mat)}</td>"
+            f"<b>{esc(mat)}</b></span></td>"
             f"<td>{info['price']} Cr</td><td>{esc(bname)}</td>"
             f"<td>{esc(inputs)}</td><td>{used}</td></tr>")
     return "\n".join(rows)
@@ -140,11 +131,9 @@ def build_notes():
     usage = sorted(((m, len(game.CONSUMERS[m])) for m in game.MATERIALS),
                    key=lambda kv: -kv[1])
     hubs = [f"{m} ({n}×)" for m, n in usage[:5] if n > 0]
-    max_tier = max(tier_of(m) for m in game.MATERIALS)
     return f"""
     <ul>
-      <li><b>{len(game.MATERIALS)}</b> materials, <b>{len(game.BUILDINGS)}</b>
-          buildings, deepest tier: <b>{max_tier}</b></li>
+      <li><b>{len(game.MATERIALS)}</b> materials, <b>{len(game.BUILDINGS)}</b> buildings</li>
       <li><b>Endpoints</b> (produced but never consumed — natural docking
           points for new chains): <b>{esc(', '.join(endpoints) or '—')}</b></li>
       <li><b>Most-used inputs</b>: {esc(', '.join(hubs))}</li>
@@ -154,6 +143,8 @@ def build_notes():
           <b>sum of input prices × 2</b>.</li>
       <li>Unlock logic is automatic: a building appears once all its input
           materials have been produced at least once.</li>
+      <li>Use <code>python chain_editor.py</code> to add materials and buildings
+          via the visual editor.</li>
     </ul>"""
 
 
@@ -195,7 +186,7 @@ for details.</p>
 {build_notes()}
 <h2>All materials</h2>
 <table>
-<tr><th>Material</th><th>Tier</th><th>Price</th><th>Produced by</th>
+<tr><th>Material</th><th>Price</th><th>Produced by</th>
 <th>Inputs</th><th>Used by</th></tr>
 {build_table()}
 </table>

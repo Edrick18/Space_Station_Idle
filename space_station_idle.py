@@ -106,6 +106,7 @@ MATERIALS = {
     "Motor":           {"emoji": "⚙️", "price": 572,  "pos": (420, 1390),  "color": C_MECH},
     # Tier 8
     "Basic Robot":     {"emoji": "🤖", "price": 1520, "pos": (650, 1580),  "color": C_ROBOT},
+    # END_MATERIALS
 }
 
 # Buildings in production order (raw resources first so chains flow
@@ -141,6 +142,7 @@ BUILDINGS = {
     "Motor Factory": {"output": "Motor",         "inputs": ["Machine Frame", "Steel Sheet"],  "credits": 15000, "materials": {"Machine Frame": 5, "Steel Sheet": 20},  "extraction": False},
     # Robotics
     "Robot Factory": {"output": "Basic Robot", "inputs": ["Motor", "Circuit Board", "Steel Beam"], "credits": 40000, "materials": {"Motor": 5, "Circuit Board": 5, "Steel Beam": 10}, "extraction": False},
+    # END_BUILDINGS
 }
 
 BUILDING_ORDER = list(BUILDINGS.keys())
