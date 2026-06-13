@@ -39,6 +39,7 @@ UPDATE_FILE = "space_station_idle.py"
 EXE_NAME = "SpaceStationIdle.exe"
 
 INTERVAL = 5.0              # seconds per production cycle
+INPUT_RATIO = 3             # units of each input consumed per 1 output produced
 OFFLINE_CAP = 24 * 3600     # offline production capped at 24 hours
 AUTOSAVE_SECONDS = 30.0
 COST_GROWTH = 1.2           # credit cost rises per building purchased
@@ -443,13 +444,14 @@ class Game:
         n = self.counts[bname]
         if n <= 0:
             return
+        ratio = 1 if b["extraction"] else INPUT_RATIO
         p = n
         for m in b["inputs"]:
-            p = min(p, self.stock[m])
+            p = min(p, self.stock[m] // ratio)
         if p <= 0:
             return
         for m in b["inputs"]:
-            self.stock[m] -= p
+            self.stock[m] -= p * ratio
         out = b["output"]
         self.stock[out] += p
         self.produced_total[out] += p
@@ -537,7 +539,7 @@ class Game:
         return self.counts[PRODUCER[mat]] / INTERVAL
 
     def rate_consumed(self, mat):
-        return sum(self.counts[c] for c in CONSUMERS[mat]) / INTERVAL
+        return sum(self.counts[c] for c in CONSUMERS[mat]) * INPUT_RATIO / INTERVAL
 
     # ----- Saving / loading -----
 
