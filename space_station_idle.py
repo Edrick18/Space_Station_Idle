@@ -25,7 +25,7 @@ VERSION = "1.0.0"
 # the repository below. If so, it is downloaded and becomes active on the
 # next launch. Without internet, without an update, or on any error the
 # game simply keeps running — updates are never mandatory.
-UPDATE_USER = "Edick18"
+UPDATE_USER = "Edrick18"
 UPDATE_REPO = "Space_Station_Idle"
 UPDATE_BRANCH = "main"
 UPDATE_FILE = "space_station_idle.py"
