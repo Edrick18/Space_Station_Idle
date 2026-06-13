@@ -70,8 +70,9 @@ def ensure_markers():
 
 # ── line builders ─────────────────────────────────────────────────────────────
 def _mat_line(d):
+    price_part = f'"price": {int(d["price"])}, ' if d.get("extraction") else ""
     return (f'    "{d["name"]}": {{"emoji": "{d["emoji"]}", '
-            f'"price": {int(d["price"])}, '
+            f'{price_part}'
             f'"pos": ({int(d["x"])}, {int(d["y"])}), '
             f'"color": {d["color_const"]}}},\n')
 
@@ -106,6 +107,7 @@ def save_building(d):
             mname = new_mat["name"]
             if f'"{mname}":' in src:
                 raise ValueError(f'Material "{mname}" already exists')
+            new_mat["extraction"] = bld.get("extraction", False)
             src = src.replace(MAT_MARKER, _mat_line(new_mat) + MAT_MARKER)
         src = src.replace(BLD_MARKER, _bld_line(bld) + BLD_MARKER)
     else:  # edit
@@ -114,6 +116,7 @@ def save_building(d):
             raise ValueError(f'Building "{bname}" not found')
         src = pat.sub(_bld_line(bld), src, count=1)
         if mat_edit:
+            mat_edit["extraction"] = bld.get("extraction", False)
             mp = re.compile(rf'^    "{re.escape(mat_edit["name"])}"[^\n]*\n', re.MULTILINE)
             if mp.search(src):
                 src = mp.sub(_mat_line(mat_edit), src, count=1)
@@ -402,8 +405,9 @@ header h1{font-size:15px;font-weight:600}
         <input id="mat-emoji" placeholder="🧱"></div>
     </div>
     <div class="row">
-      <div class="fr"><label>Sell Price (Cr)</label>
-        <input id="mat-price" type="number" min="1" placeholder="6"></div>
+      <div class="fr" id="mat-price-row" style="display:none"><label>Sell Price (Cr)</label>
+        <input id="mat-price" type="number" min="1" placeholder="1">
+        <div class="hint">Only for raw resources — others are auto-calculated.</div></div>
       <div class="fr"><label>Chain Color</label>
         <select id="mat-color"></select></div>
     </div>
@@ -414,8 +418,9 @@ header h1{font-size:15px;font-weight:600}
     <div class="row">
       <div class="fr" style="max-width:72px"><label>Emoji</label>
         <input id="mat-edit-emoji" placeholder="🧱"></div>
-      <div class="fr"><label>Sell Price (Cr)</label>
-        <input id="mat-edit-price" type="number" min="1"></div>
+      <div class="fr" id="mat-edit-price-row" style="display:none"><label>Sell Price (Cr)</label>
+        <input id="mat-edit-price" type="number" min="1">
+        <div class="hint">Only for raw resources — others are auto-calculated.</div></div>
       <div class="fr"><label>Chain Color</label>
         <select id="mat-edit-color"></select></div>
     </div>
@@ -596,7 +601,9 @@ function openModal(editData) {
   if (isEdit) {
     const m = D.materials[editData.output] || {};
     document.getElementById('mat-edit-emoji').value = m.emoji || '';
-    document.getElementById('mat-edit-price').value = m.price || '';
+    const isRaw = editData.extraction;
+    document.getElementById('mat-edit-price-row').style.display = isRaw ? '' : 'none';
+    if (isRaw) document.getElementById('mat-edit-price').value = m.price || '';
     document.getElementById('mat-edit-color').value = m.color_const || 'C_METAL';
   }
 
@@ -650,6 +657,7 @@ function onExtractionChange() {
   const ext = document.getElementById('extraction').checked;
   document.getElementById('inps-row').style.opacity = ext ? '0.35' : '1';
   document.getElementById('inps-row').style.pointerEvents = ext ? 'none' : '';
+  document.getElementById('mat-price-row').style.display = ext ? '' : 'none';
 }
 
 function calcPos(inputNames) {
@@ -706,7 +714,7 @@ async function saveBuilding() {
     payload.new_material = {
       name:        bld.output,
       emoji:       document.getElementById('mat-emoji').value.trim() || '❓',
-      price:       parseInt(document.getElementById('mat-price').value) || 1,
+      price:       extraction ? (parseInt(document.getElementById('mat-price').value) || 1) : 1,
       color_const: document.getElementById('mat-color').value,
       x:           parseInt(box.dataset.x) || autoPos.x,
       y:           parseInt(box.dataset.y) || autoPos.y,
@@ -721,7 +729,7 @@ async function saveBuilding() {
       payload.mat_edit = {
         name:        output,
         emoji:       document.getElementById('mat-edit-emoji').value.trim() || m.emoji,
-        price:       parseInt(document.getElementById('mat-edit-price').value) || m.price,
+        price:       bld.extraction ? (parseInt(document.getElementById('mat-edit-price').value) || m.price) : 1,
         color_const: document.getElementById('mat-edit-color').value,
         x: m.x, y: m.y,
       };
