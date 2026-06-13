@@ -15,7 +15,6 @@ import sys
 import threading
 import time
 import tkinter as tk
-from tkinter import messagebox
 
 # When packaged as an exe (PyInstaller), __file__ points into a temp folder —
 # the save file and updates must live next to the exe instead.
@@ -24,7 +23,7 @@ BASE_DIR = os.path.dirname(sys.executable if IS_FROZEN
                            else os.path.abspath(__file__))
 SAVE_FILE = os.path.join(BASE_DIR, "savegame.json")
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # --- Auto-update via GitHub (optional — fails silently) ---
 # On startup a background thread checks whether a newer version exists.
@@ -621,6 +620,11 @@ class App(tk.Tk):
         self.panel_mouse = None
         self.panel_buttons = []     # (x1, y1, x2, y2, enabled, callback)
 
+        # In-game dialog (replaces native message boxes)
+        self.dialog = None
+        self.dialog_buttons = []    # (x1, y1, x2, y2, callback)
+        self.dialog_mouse = None
+
         # Update check in the background — never blocks the game
         self.update_info = {}
         self.update_prompted = False
@@ -742,6 +746,96 @@ class App(tk.Tk):
         self.after(FRAME_MS, self.home_loop)
 
     # ------------------------------------------------------------------
+    # In-game dialog — styled like the rest of the game, no native popups
+    # ------------------------------------------------------------------
+
+    def show_dialog(self, title, message, buttons,
+                    accent="#60a5fa", emoji="🛰️"):
+        """Shows a centered dialog card. `buttons` is a list of
+        (label, callback, primary) — callbacks may be None."""
+        self.close_dialog()
+        w = 480
+        dlg = tk.Canvas(self, bg=PANEL_BG, width=w, height=120,
+                        highlightthickness=1, highlightbackground="#2b3a63")
+        self.dialog = dlg
+        self.dialog_mouse = None
+
+        # Accent strip + badge + title
+        dlg.create_rectangle(0, 0, w, 4, fill=accent, outline="")
+        bx, by, br = 36, 40, 17
+        dlg.create_oval(bx - br, by - br, bx + br, by + br,
+                        fill=blend(accent, PANEL_BG, 0.75),
+                        outline=blend(accent, PANEL_BG, 0.35))
+        dlg.create_text(bx, by, text=emoji, font=("Segoe UI Emoji", 13))
+        dlg.create_text(64, by, anchor="w", text=title,
+                        font=("Segoe UI", 14, "bold"), fill=TEXT_MAIN)
+
+        # Message (wrapped); dialog height adapts to the text
+        msg = dlg.create_text(28, 72, anchor="nw", text=message,
+                              font=("Segoe UI", 10), fill=TEXT_DIM,
+                              width=w - 56)
+        btn_y = dlg.bbox(msg)[3] + 24
+        dlg.config(height=btn_y + 36 + 22)
+
+        def render_buttons():
+            dlg.delete("btn")
+            self.dialog_buttons = []
+            x2 = w - 24
+            hover_any = False
+            for label, cb, primary in reversed(buttons):
+                bw = max(110, 9 * len(label) + 30)
+                x1 = x2 - bw
+                hovered = (self.dialog_mouse is not None and
+                           x1 <= self.dialog_mouse[0] <= x2 and
+                           btn_y <= self.dialog_mouse[1] <= btn_y + 36)
+                hover_any |= hovered
+                base = "#2563eb" if primary else "#1d2a4d"
+                hov = "#3b82f6" if primary else "#27395f"
+                round_rect(dlg, x1, btn_y, x2, btn_y + 36, 9,
+                           fill=hov if hovered else base, outline="", tags="btn")
+                dlg.create_text((x1 + x2) / 2, btn_y + 18, text=label,
+                                font=("Segoe UI", 10, "bold"),
+                                fill="white", tags="btn")
+                self.dialog_buttons.append((x1, btn_y, x2, btn_y + 36, cb))
+                x2 = x1 - 10
+            dlg.config(cursor="hand2" if hover_any else "")
+
+        render_buttons()
+        dlg.bind("<Motion>", lambda e: (setattr(self, "dialog_mouse", (e.x, e.y)),
+                                        render_buttons()))
+        dlg.bind("<Leave>", lambda e: (setattr(self, "dialog_mouse", None),
+                                       render_buttons()))
+        dlg.bind("<Button-1>", self._on_dialog_click)
+
+        dlg.place(relx=0.5, rely=0.36, anchor="center")
+        tk.Misc.tkraise(dlg)
+        self._dialog_anim_step({"t0": time.monotonic(), "dlg": dlg})
+
+    def _dialog_anim_step(self, anim):
+        """Gently floats the dialog into place."""
+        dlg = anim["dlg"]
+        if dlg is not self.dialog or not dlg.winfo_exists():
+            return
+        prog = (time.monotonic() - anim["t0"]) / 0.25
+        dlg.place_configure(rely=0.36 + 0.06 * ease_out(prog))
+        if prog < 1.0:
+            self.after(10, lambda: self._dialog_anim_step(anim))
+
+    def _on_dialog_click(self, event):
+        for x1, y1, x2, y2, cb in self.dialog_buttons:
+            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+                self.close_dialog()
+                if cb is not None:
+                    cb()
+                return
+
+    def close_dialog(self):
+        if self.dialog is not None and self.dialog.winfo_exists():
+            self.dialog.destroy()
+        self.dialog = None
+        self.dialog_buttons = []
+
+    # ------------------------------------------------------------------
     # Update flow: ask the player, download, restart on the new version
     # ------------------------------------------------------------------
 
@@ -751,21 +845,30 @@ class App(tk.Tk):
         status = info.get("status")
 
         if status == "update-available" and not self.update_prompted:
+            if self.dialog is not None:
+                return  # another dialog is open — ask on a later frame
             self.update_prompted = True
             v = info.get("version", "?")
-            if messagebox.askyesno(
-                    "Update available",
-                    f"Version {v} of Space Station Idle is available.\n\n"
-                    f"Download and restart now?\n\n"
-                    f"Choosing 'No' simply keeps the current version "
-                    f"(v{VERSION}) — you can keep playing normally.",
-                    parent=self):
+
+            def accept():
                 info["status"] = "downloading"
                 self._show_update_note(f"⬇ Downloading update v{v} ...")
                 threading.Thread(target=download_update,
                                  args=(info,), daemon=True).start()
-            else:
+
+            def decline():
                 info["status"] = "declined"
+
+            self.show_dialog(
+                "Update available",
+                f"Version {v} of Space Station Idle is available.\n\n"
+                f"Download it now? The game restarts on the new version "
+                f"right away.\n\n"
+                f"'Not now' keeps the current version (v{VERSION}) — "
+                f"you can keep playing normally.",
+                [("Not now", decline, False),
+                 ("Update & restart", accept, True)],
+                accent="#2563eb", emoji="⬆")
 
         elif status == "downloaded":
             info["status"] = "installing"
@@ -839,12 +942,14 @@ class App(tk.Tk):
                       if self.game.stock[m] > stock_before.get(m, 0)}
             if gained:
                 top = sorted(gained.items(), key=lambda kv: -kv[1])[:5]
-                lines = [f"  {MATERIALS[m]['emoji']} {m}: +{fmt(v)}" for m, v in top]
+                lines = [f"{MATERIALS[m]['emoji']} {m}:  +{fmt(v)}" for m, v in top]
                 hours = min(elapsed, OFFLINE_CAP) / 3600
-                messagebox.showinfo(
+                self.show_dialog(
                     "Welcome back!",
-                    f"Your station kept working for {fmt_rate(hours)} hours:\n\n"
-                    + "\n".join(lines), parent=self)
+                    f"Your station kept working for {fmt_rate(hours)} hours "
+                    f"while you were away:\n\n" + "\n".join(lines),
+                    [("Continue", None, True)],
+                    accent=GOLD, emoji="🚀")
 
         self.credits_shown = float(self.game.credits)
         self.loop()
