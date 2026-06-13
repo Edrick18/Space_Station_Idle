@@ -15,5 +15,8 @@ build/
 dist/
 *.spec
 
+# Generierte Entwickler-Übersicht
+chain_overview.html
+
 # Lokale Claude-Code-Einstellungen
 .claude/
