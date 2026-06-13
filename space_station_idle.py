@@ -76,37 +76,37 @@ C_ROBOT = "#f472b6"
 # Material: emoji, sell price, position (x, y), accent color
 MATERIALS = {
     # Tier 0 — raw resources
-    "Iron Ore":        {"emoji": "🔩", "price": 1,    "pos": (150, 60),    "color": C_METAL},
-    "Coal":            {"emoji": "⚫", "price": 1,    "pos": (420, 60),    "color": C_COAL},
-    "Copper Ore":      {"emoji": "🟠", "price": 1,    "pos": (690, 60),    "color": C_COPPER},
+    "Iron Ore": {"emoji": "🔩", "price": 1, "pos": (150, 60), "color": C_METAL},
+    "Coal": {"emoji": "⚫", "price": 1, "pos": (420, 60), "color": C_COAL},
+    "Copper Ore": {"emoji": "🟠", "price": 1, "pos": (690, 60), "color": C_COPPER},
     "Silicon Sand":    {"emoji": "🏜️", "price": 1,    "pos": (960, 60),    "color": C_SILICON},
-    "Crude Oil":       {"emoji": "🛢️", "price": 1,    "pos": (1230, 60),   "color": C_OIL},
+    "Crude Oil": {"emoji": "🛢️", "price": 1, "pos": (1230, 60), "color": C_OIL},
     # Tier 1 — first processing
-    "Iron Ingot":      {"emoji": "🧱", "price": 2,    "pos": (150, 250),   "color": C_METAL},
-    "Copper Ingot":    {"emoji": "🟧", "price": 2,    "pos": (690, 250),   "color": C_COPPER},
-    "Raw Silicon":     {"emoji": "💎", "price": 2,    "pos": (960, 250),   "color": C_SILICON},
-    "Plastic":         {"emoji": "🧪", "price": 2,    "pos": (1230, 250),  "color": C_OIL},
+    "Iron Ingot": {"emoji": "🧱", "price": 6,       "pos": (150, 250),  "color": C_METAL},
+    "Copper Ingot":    {"emoji": "🟧", "price": 6,       "pos": (690, 250),  "color": C_COPPER},
+    "Raw Silicon":     {"emoji": "💎", "price": 6,       "pos": (960, 250),  "color": C_SILICON},
+    "Plastic":         {"emoji": "🧪", "price": 6,       "pos": (1230, 250), "color": C_OIL},
     # Tier 2
-    "Steel Ingot":     {"emoji": "⚒️", "price": 6,    "pos": (280, 440),   "color": C_METAL},
-    "Copper Wire":     {"emoji": "🧵", "price": 6,    "pos": (690, 440),   "color": C_COPPER},
-    "Silicon Wafer":   {"emoji": "💿", "price": 8,    "pos": (960, 440),   "color": C_SILICON},
+    "Steel Ingot":     {"emoji": "⚒️", "price": 42,      "pos": (280, 440),  "color": C_METAL},
+    "Copper Wire":     {"emoji": "🧵", "price": 42,      "pos": (690, 440),  "color": C_COPPER},
+    "Silicon Wafer":   {"emoji": "💿", "price": 72,      "pos": (960, 440),  "color": C_SILICON},
     # Tier 3
-    "Iron Plate":      {"emoji": "🟫", "price": 16,   "pos": (150, 630),   "color": C_METAL},
-    "Steel Sheet":     {"emoji": "🪨", "price": 14,   "pos": (420, 630),   "color": C_METAL},
-    "Copper Cable":    {"emoji": "🪢", "price": 16,   "pos": (690, 630),   "color": C_COPPER},
-    "Microchip":       {"emoji": "🔲", "price": 28,   "pos": (960, 630),   "color": C_SILICON},
+    "Iron Plate":      {"emoji": "🟫", "price": 288,     "pos": (150, 630),  "color": C_METAL},
+    "Steel Sheet":     {"emoji": "🪨", "price": 258,     "pos": (420, 630),  "color": C_METAL},
+    "Copper Cable":    {"emoji": "🪢", "price": 288,     "pos": (690, 630),  "color": C_COPPER},
+    "Microchip":       {"emoji": "🔲", "price": 684,     "pos": (960, 630),  "color": C_SILICON},
     # Tier 4
-    "Steel Beam":      {"emoji": "🏗️", "price": 60,   "pos": (280, 820),   "color": C_METAL},
-    "Insulated Cable": {"emoji": "🔌", "price": 36,   "pos": (690, 820),   "color": C_COPPER},
+    "Steel Beam":      {"emoji": "🏗️", "price": 3276,    "pos": (280, 820),  "color": C_METAL},
+    "Insulated Cable": {"emoji": "🔌", "price": 1764,    "pos": (690, 820),  "color": C_COPPER},
     # Tier 5
-    "Coil":            {"emoji": "🧲", "price": 76,   "pos": (500, 1010),  "color": C_COPPER},
-    "Circuit Board":   {"emoji": "💻", "price": 128,  "pos": (830, 1010),  "color": C_SILICON},
+    "Coil":            {"emoji": "🧲", "price": 10620,   "pos": (500, 1010), "color": C_COPPER},
+    "Circuit Board":   {"emoji": "💻", "price": 14688,   "pos": (830, 1010), "color": C_SILICON},
     # Tier 6
-    "Machine Frame":   {"emoji": "🛠️", "price": 272,  "pos": (420, 1200),  "color": C_MECH},
+    "Machine Frame":   {"emoji": "🛠️", "price": 83376,   "pos": (420, 1200), "color": C_MECH},
     # Tier 7
-    "Motor":           {"emoji": "⚙️", "price": 572,  "pos": (420, 1390),  "color": C_MECH},
+    "Motor":           {"emoji": "⚙️", "price": 501804,  "pos": (420, 1390), "color": C_MECH},
     # Tier 8
-    "Basic Robot":     {"emoji": "🤖", "price": 1520, "pos": (650, 1580),  "color": C_ROBOT},
+    "Basic Robot":     {"emoji": "🤖", "price": 3118608, "pos": (650, 1580), "color": C_ROBOT},
     # END_MATERIALS
 }
 
@@ -114,13 +114,13 @@ MATERIALS = {
 # cleanly within a single cycle)
 BUILDINGS = {
     # Extraction
-    "Iron Mine":      {"output": "Iron Ore",     "inputs": [], "credits": 50,  "materials": {}, "extraction": True},
-    "Coal Mine":      {"output": "Coal",         "inputs": [], "credits": 50,  "materials": {}, "extraction": True},
-    "Copper Mine":    {"output": "Copper Ore",   "inputs": [], "credits": 60,  "materials": {}, "extraction": True},
+    "Iron Mine": {"output": "Iron Ore", "inputs": [], "credits": 30, "materials": {}, "extraction": True},
+    "Coal Mine": {"output": "Coal", "inputs": [], "credits": 30, "materials": {}, "extraction": True},
+    "Copper Mine": {"output": "Copper Ore", "inputs": [], "credits": 30, "materials": {}, "extraction": True},
     "Silicon Quarry": {"output": "Silicon Sand", "inputs": [], "credits": 60,  "materials": {}, "extraction": True},
-    "Oil Pump":       {"output": "Crude Oil",    "inputs": [], "credits": 80,  "materials": {}, "extraction": True},
+    "Oil Pump": {"output": "Crude Oil", "inputs": [], "credits": 30, "materials": {}, "extraction": True},
     # First processing
-    "Iron Smelter":    {"output": "Iron Ingot",   "inputs": ["Iron Ore"],     "credits": 100, "materials": {"Iron Ore": 50},     "extraction": False},
+    "Iron Smelter": {"output": "Iron Ingot", "inputs": ['Iron Ore'], "credits": 100, "materials": {"Iron Ore": 50}, "extraction": False},
     "Copper Smelter":  {"output": "Copper Ingot", "inputs": ["Copper Ore"],   "credits": 100, "materials": {"Copper Ore": 50},   "extraction": False},
     "Silicon Furnace": {"output": "Raw Silicon",  "inputs": ["Silicon Sand"], "credits": 100, "materials": {"Silicon Sand": 50}, "extraction": False},
     "Refinery":        {"output": "Plastic",      "inputs": ["Crude Oil"],    "credits": 120, "materials": {"Crude Oil": 50},    "extraction": False},
