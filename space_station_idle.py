@@ -365,7 +365,7 @@ class App(tk.Tk):
         self.geometry("1280x760")
         self._build_ui()
         # global drag handlers — always active, guarded by _drag_btype check
-        self.bind_all("<Motion>",          self._on_drag_motion)
+        self.bind_all("<B1-Motion>",       self._on_drag_motion)
         self.bind_all("<ButtonRelease-1>", self._on_drag_release)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self._schedule_tick()
@@ -675,13 +675,8 @@ class App(tk.Tk):
     def _on_drag_motion(self, event: tk.Event):
         if not self._drag_btype:
             return
-        dx = event.x_root - self._drag_start_xy[0]
-        dy = event.y_root - self._drag_start_xy[1]
-        if abs(dx) < 5 and abs(dy) < 5:
-            return   # ignore tiny jitter
         if not self._drag_moved:
             self._drag_moved = True
-            # create ghost now that we know it's a real drag
             bname = self._drag_btype
             out   = BUILDINGS[bname]["output"]
             self._drag_ghost = tk.Label(
